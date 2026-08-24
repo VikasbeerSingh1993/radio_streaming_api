@@ -7,10 +7,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/admin/css/admin.css">
+  <link rel="stylesheet" href="/admin/css/admin.css?v=20260824b">
 </head>
 <body>
-  <div id="admin-boot" style="min-height:100vh;display:grid;place-items:center;background:#0b1220;color:#93a0b8;font-family:sans-serif">Loading admin console...</div>
+  <div id="admin-boot" style="min-height:100vh;display:grid;place-items:center;background:#eef2f7;color:#5b6b7c;font-family:sans-serif">Loading admin console...</div>
   <div class="login-wrap ng-cloak" ng-if="!isAuthed" ng-cloak>
     <form class="login-card" ng-submit="login()">
       <div class="brand-mark">RS</div>
@@ -142,41 +142,45 @@
       <p class="muted" ng-if="!filtered().length">No events in this view.</p>
     </div>
 
-    <div class="modal-backdrop" ng-if="form">
-      <form class="modal" ng-submit="save()">
-        <h2>{{form._id ? 'Edit event' : 'New event'}}</h2>
+    <div class="modal-backdrop" ng-if="form" ng-click="closeForm()">
+      <form class="modal" novalidate ng-submit="save()" ng-click="$event.stopPropagation()">
+        <div class="modal-head">
+          <h2>{{form._id ? 'Edit Event' : 'New Event'}}</h2>
+          <button class="close-btn" type="button" title="Close" ng-click="closeForm()">&times;</button>
+        </div>
+        <div class="form-error" ng-if="formError">{{formError}}</div>
         <div class="grid-2">
-          <label class="field"><span>Title</span><input ng-model="form.title" required></label>
-          <label class="field"><span>City</span><input ng-model="form.city" required></label>
-          <label class="field"><span>Start</span><input type="datetime-local" ng-model="form.date" required></label>
-          <label class="field"><span>End</span><input type="datetime-local" ng-model="form.end_date"></label>
+          <label class="field"><span>Title</span><input ng-model="form.title"></label>
+          <label class="field"><span>City</span><input ng-model="form.city"></label>
+          <label class="field"><span>Start Date</span><input type="datetime-local" local-datetime ng-model="form.date"></label>
+          <label class="field"><span>End Date</span><input type="datetime-local" local-datetime ng-model="form.end_date"></label>
           <label class="field"><span>Venue</span><input ng-model="form.address"></label>
-          <label class="field"><span>Organized by</span><input ng-model="form.organizedBy"></label>
+          <label class="field"><span>Organized By</span><input ng-model="form.organizedBy"></label>
           <label class="field"><span>Organization</span><input ng-model="form.organization" placeholder="e.g. dodra"></label>
-          <label class="field"><span>Category key</span><input ng-model="form.category" placeholder="optional scope"></label>
+          <label class="field"><span>Category</span><input ng-model="form.category" placeholder="Optional"></label>
           <label class="field"><span>Latitude</span><input type="number" step="any" ng-model="form.latitude"></label>
           <label class="field"><span>Longitude</span><input type="number" step="any" ng-model="form.longitude"></label>
           <label class="field">
             <span>Approval</span>
             <select ng-model="form.approvalStatus">
-              <option value="pending">pending</option>
-              <option value="approved">approved</option>
-              <option value="rejected">rejected</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
             </select>
           </label>
           <label class="field">
-            <span>Schedule status</span>
+            <span>Schedule Status</span>
             <select ng-model="form.status">
-              <option value="scheduled">scheduled</option>
-              <option value="canceled">canceled</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="canceled">Canceled</option>
             </select>
           </label>
         </div>
         <label class="field"><span>Description</span><textarea ng-model="form.description"></textarea></label>
-        <label class="field"><span>Review note</span><input ng-model="form.reviewNote"></label>
-        <div class="row-actions">
+        <label class="field"><span>Review Note</span><input ng-model="form.reviewNote"></label>
+        <div class="modal-actions">
+          <button class="btn btn-ghost btn-sm" type="button" ng-click="closeForm()">Cancel</button>
           <button class="btn btn-primary btn-sm" type="submit">Save</button>
-          <button class="btn btn-ghost btn-sm" type="button" ng-click="form=null">Cancel</button>
         </div>
       </form>
     </div>
@@ -212,27 +216,37 @@
         </tbody>
       </table>
     </div>
-    <div class="modal-backdrop" ng-if="form">
-      <form class="modal" ng-submit="save()">
-        <h2>{{form._id ? 'Edit station' : 'New station'}}</h2>
+    <div class="modal-backdrop" ng-if="form" ng-click="closeForm()">
+      <form class="modal" novalidate ng-submit="save()" ng-click="$event.stopPropagation()">
+        <div class="modal-head">
+          <h2>{{form._id ? 'Edit Station' : 'New Station'}}</h2>
+          <button class="close-btn" type="button" title="Close" ng-click="closeForm()">&times;</button>
+        </div>
+        <div class="form-error" ng-if="formError">{{formError}}</div>
         <div class="grid-2">
-          <label class="field"><span>English name</span><input ng-model="form.nameEn" required></label>
-          <label class="field"><span>Hindi name</span><input ng-model="form.nameHi"></label>
+          <label class="field"><span>English Name</span><input ng-model="form.nameEn"></label>
+          <label class="field"><span>Hindi Name</span><input ng-model="form.nameHi"></label>
           <label class="field">
-            <span>Category key</span>
-            <select ng-model="form.category">
-              <option ng-repeat="cat in categories" value="{{cat.category}}">{{cat.category}}</option>
+            <span>Category</span>
+            <select ng-model="form.category" ng-options="cat.category as (cat | categoryName) for cat in categories">
+              <option value="">Select Category</option>
             </select>
           </label>
           <label class="field"><span>Language</span><input ng-model="form.language"></label>
-          <label class="field"><span>Play mode</span><input ng-model="form.play_mode"></label>
+          <label class="field">
+            <span>Play Mode</span>
+            <select ng-model="form.play_mode">
+              <option value="sequence">Sequence</option>
+              <option value="shuffle">Shuffle</option>
+            </select>
+          </label>
           <label class="field"><span>Type</span><input ng-model="form.type"></label>
           <label class="field"><span>Thumbnail URL</span><input ng-model="form.thumbnail"></label>
-          <label class="field"><span>Live</span><select ng-model="form.live" ng-options="v as (v?'Yes':'No') for v in [true,false]"></select></label>
+          <label class="check-pill" style="align-self:end;margin-bottom:14px"><input type="checkbox" ng-model="form.live"> Live Station</label>
         </div>
-        <div class="row-actions">
+        <div class="modal-actions">
+          <button class="btn btn-ghost btn-sm" type="button" ng-click="closeForm()">Cancel</button>
           <button class="btn btn-primary btn-sm" type="submit">Save</button>
-          <button class="btn btn-ghost btn-sm" type="button" ng-click="form=null">Cancel</button>
         </div>
       </form>
     </div>
@@ -267,19 +281,23 @@
         </tbody>
       </table>
     </div>
-    <div class="modal-backdrop" ng-if="form">
-      <form class="modal" ng-submit="save()">
-        <h2>{{form._id ? 'Edit category' : 'New category'}}</h2>
+    <div class="modal-backdrop" ng-if="form" ng-click="closeForm()">
+      <form class="modal" novalidate ng-submit="save()" ng-click="$event.stopPropagation()">
+        <div class="modal-head">
+          <h2>{{form._id ? 'Edit Category' : 'New Category'}}</h2>
+          <button class="close-btn" type="button" title="Close" ng-click="closeForm()">&times;</button>
+        </div>
+        <div class="form-error" ng-if="formError">{{formError}}</div>
         <div class="grid-2">
-          <label class="field"><span>Key</span><input ng-model="form.category" required></label>
+          <label class="field"><span>Key</span><input ng-model="form.category"></label>
           <label class="field"><span>Order</span><input type="number" ng-model="form.order"></label>
-          <label class="field"><span>English name</span><input ng-model="form.nameEn" required></label>
-          <label class="field"><span>Hindi name</span><input ng-model="form.nameHi"></label>
+          <label class="field"><span>English Name</span><input ng-model="form.nameEn"></label>
+          <label class="field"><span>Hindi Name</span><input ng-model="form.nameHi"></label>
           <label class="field"><span>Icon</span><input ng-model="form.icon"></label>
         </div>
-        <div class="row-actions">
+        <div class="modal-actions">
+          <button class="btn btn-ghost btn-sm" type="button" ng-click="closeForm()">Cancel</button>
           <button class="btn btn-primary btn-sm" type="submit">Save</button>
-          <button class="btn btn-ghost btn-sm" type="button" ng-click="form=null">Cancel</button>
         </div>
       </form>
     </div>
@@ -321,23 +339,27 @@
         </tbody>
       </table>
     </div>
-    <div class="modal-backdrop" ng-if="form">
-      <form class="modal" ng-submit="save()">
-        <h2>{{form._id ? 'Edit link' : 'New link'}}</h2>
+    <div class="modal-backdrop" ng-if="form" ng-click="closeForm()">
+      <form class="modal" novalidate ng-submit="save()" ng-click="$event.stopPropagation()">
+        <div class="modal-head">
+          <h2>{{form._id ? 'Edit Audio Link' : 'New Audio Link'}}</h2>
+          <button class="close-btn" type="button" title="Close" ng-click="closeForm()">&times;</button>
+        </div>
+        <div class="form-error" ng-if="formError">{{formError}}</div>
         <div class="grid-2">
-          <label class="field"><span>Title</span><input ng-model="form.nameEn" required></label>
+          <label class="field"><span>Title</span><input ng-model="form.nameEn"></label>
           <label class="field">
             <span>Station</span>
-            <select ng-model="form.station_id" required>
-              <option ng-repeat="station in stations" value="{{station._id}}">{{station | stationName}}</option>
+            <select ng-model="form.station_id" ng-options="station._id as (station | stationName) for station in stations">
+              <option value="">Select Station</option>
             </select>
           </label>
           <label class="field"><span>Sequence</span><input type="number" ng-model="form.sequence"></label>
-          <label class="field"><span>URL</span><input ng-model="form.url" required></label>
+          <label class="field"><span>URL</span><input ng-model="form.url"></label>
         </div>
-        <div class="row-actions">
+        <div class="modal-actions">
+          <button class="btn btn-ghost btn-sm" type="button" ng-click="closeForm()">Cancel</button>
           <button class="btn btn-primary btn-sm" type="submit">Save</button>
-          <button class="btn btn-ghost btn-sm" type="button" ng-click="form=null">Cancel</button>
         </div>
       </form>
     </div>
@@ -365,7 +387,7 @@
               <strong>{{user.displayName || user.username}}</strong>
               <div class="muted">{{user.username}}</div>
             </td>
-            <td><span class="role-pill">{{user.role}}</span></td>
+            <td><span class="role-pill">{{user.superAdmin ? 'Super Admin' : 'Sub-Admin'}}</span></td>
             <td>{{user.organization || '—'}}</td>
             <td class="muted">
               <span ng-if="user.superAdmin">Full access</span>
@@ -381,27 +403,31 @@
         </tbody>
       </table>
     </div>
-    <div class="modal-backdrop" ng-if="form">
-      <form class="modal" ng-submit="save()">
-        <h2>{{form.id ? 'Edit user' : 'New sub-admin'}}</h2>
+    <div class="modal-backdrop" ng-if="form" ng-click="closeForm()">
+      <form class="modal" novalidate ng-submit="save()" ng-click="$event.stopPropagation()">
+        <div class="modal-head">
+          <h2>{{form.id ? 'Edit User' : 'New Sub-Admin'}}</h2>
+          <button class="close-btn" type="button" title="Close" ng-click="closeForm()">&times;</button>
+        </div>
+        <div class="form-error" ng-if="formError">{{formError}}</div>
         <div class="grid-2">
-          <label class="field"><span>Username</span><input ng-model="form.username" required ng-disabled="!!form.id"></label>
-          <label class="field"><span>Password</span><input type="password" ng-model="form.password" ng-required="!form.id" placeholder="{{form.id ? 'Leave blank to keep' : 'Min 8 characters'}}"></label>
-          <label class="field"><span>Display name</span><input ng-model="form.displayName"></label>
-          <label class="field"><span>Home organization</span><input ng-model="form.organization" placeholder="e.g. dodra"></label>
+          <label class="field"><span>Username</span><input ng-model="form.username" ng-disabled="!!form.id"></label>
+          <label class="field"><span>Password</span><input type="password" ng-model="form.password" placeholder="{{form.id ? 'Leave blank to keep' : 'Min 8 characters'}}"></label>
+          <label class="field"><span>Display Name</span><input ng-model="form.displayName"></label>
+          <label class="field"><span>Home Organization</span><input ng-model="form.organization" placeholder="e.g. dodra"></label>
         </div>
         <label class="field">
           <span>Role</span>
           <select ng-model="form.role">
-            <option value="SUB_ADMIN">Sub-admin (limited)</option>
-            <option value="SUPER_ADMIN">Super admin (full access)</option>
+            <option value="SUB_ADMIN">Sub-Admin (Limited)</option>
+            <option value="SUPER_ADMIN">Super Admin (Full Access)</option>
           </select>
         </label>
-        <label class="check-pill"><input type="checkbox" ng-model="form.enabled"> Account enabled</label>
-        <label class="check-pill"><input type="checkbox" ng-model="form.ownRecordsOnly"> Only records they create</label>
+        <label class="check-pill"><input type="checkbox" ng-model="form.enabled"> Account Enabled</label>
+        <label class="check-pill"><input type="checkbox" ng-model="form.ownRecordsOnly"> Only Records They Create</label>
         <div ng-if="form.role!=='SUPER_ADMIN'">
           <h3>Permissions</h3>
-          <p class="muted">Tick Read to see a page. Add / Edit / Delete are independent, so you can allow editing without delete.</p>
+          <p class="muted">Tick Read to see a page. Add, Edit, and Delete are independent, so you can allow editing without delete.</p>
           <div class="table-wrap">
             <table class="perm-table">
               <thead>
@@ -420,23 +446,23 @@
             </table>
           </div>
           <label class="field">
-            <span>Allowed organizations (comma separated)</span>
+            <span>Allowed Organizations (Comma Separated)</span>
             <input ng-model="form.allowedOrganizationsText" placeholder="dodra, amritsar">
           </label>
           <div class="field">
-            <span>Allowed categories (stations &amp; links follow these)</span>
+            <span>Allowed Categories (Stations And Links Follow These)</span>
             <div class="check-grid">
               <label class="check-pill" ng-repeat="cat in categories">
                 <input type="checkbox" ng-checked="hasCategory(cat.category)" ng-click="toggleCategory(cat.category)">
-                {{cat.category}}
+                {{cat | categoryName}}
               </label>
               <span class="muted" ng-if="!categories.length">Leave empty to allow every category they can read.</span>
             </div>
           </div>
         </div>
-        <div class="row-actions" style="margin-top:16px">
+        <div class="modal-actions">
+          <button class="btn btn-ghost btn-sm" type="button" ng-click="closeForm()">Cancel</button>
           <button class="btn btn-primary btn-sm" type="submit">Save</button>
-          <button class="btn btn-ghost btn-sm" type="button" ng-click="form=null">Cancel</button>
         </div>
       </form>
     </div>
@@ -471,13 +497,13 @@
           "https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.8.3/angular-route.min.js"
         ]);
       }).then(function () {
-        return loadScript("/admin/js/app.js");
+        return loadScript("/admin/js/app.js?v=20260824b");
       }).then(function () {
         var boot = document.getElementById("admin-boot");
         if (boot) { boot.remove(); }
         angular.bootstrap(document.documentElement, ["adminApp"]);
       }).catch(function () {
-        document.body.innerHTML = "<div style='padding:40px;font-family:sans-serif;color:#e8eef8;background:#0b1220;min-height:100vh'><h1>Admin console failed to load</h1><p>Refresh the page or allow scripts from Google/jsDelivr.</p></div>";
+        document.body.innerHTML = "<div style='padding:40px;font-family:sans-serif;color:#1c2a3a;background:#eef2f7;min-height:100vh'><h1>Admin console failed to load</h1><p>Refresh the page or allow scripts from Google/jsDelivr.</p></div>";
       });
     })();
   </script>
