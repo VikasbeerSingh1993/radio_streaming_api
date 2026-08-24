@@ -1,0 +1,11 @@
+spring.application.name=radio-streaming-api
+server.port=8080
+
+# Copy to application-local.properties or set MONGODB_URI env var
+spring.data.mongodb.uri=mongodb+srv://USERNAME:PASSWORD@cluster0.example.mongodb.net/divine_bliss_streaming
+spring.data.mongodb.database=divine_bliss_streaming
+
+spring.jackson.serialization.write-dates-as-timestamps=false
+
+# Second-level cache TTL for stations, categories, events, and audio links
+app.cache.ttl=24h
