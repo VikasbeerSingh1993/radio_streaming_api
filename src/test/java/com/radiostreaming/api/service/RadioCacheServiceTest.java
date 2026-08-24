@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -92,6 +93,43 @@ class RadioCacheServiceTest {
         List<AudioLinkDocument> links = cacheService.getAudioLinksByStation("station-1");
         assertEquals(1, links.size());
         assertEquals("link-1", links.getFirst().getId());
+    }
+
+    @Test
+    void hidesPendingEventsFromPublicList() {
+        EventDocument pending = new EventDocument();
+        pending.setTitle("Pending Sangat");
+        pending.setApprovalStatus("pending");
+        EventDocument approved = new EventDocument();
+        approved.setTitle("Approved Sangat");
+        approved.setApprovalStatus("approved");
+        when(dataService.getAllEvents()).thenReturn(List.of(pending, approved));
+
+        List<EventDocument> publicEvents = cacheService.getEvents();
+
+        assertEquals(1, publicEvents.size());
+        assertEquals("Approved Sangat", publicEvents.getFirst().getTitle());
+    }
+
+    @Test
+    void nearbyEventsFilterByRadius() {
+        EventDocument nearby = new EventDocument();
+        nearby.setTitle("Amritsar");
+        nearby.setLatitude(31.634);
+        nearby.setLongitude(74.872);
+        nearby.setApprovalStatus("approved");
+        EventDocument far = new EventDocument();
+        far.setTitle("Delhi");
+        far.setLatitude(28.6139);
+        far.setLongitude(77.209);
+        far.setApprovalStatus("approved");
+        when(dataService.getAllEvents()).thenReturn(List.of(nearby, far));
+
+        List<EventDocument> results = cacheService.getNearbyEvents(31.62, 74.876, 50);
+
+        assertEquals(1, results.size());
+        assertEquals("Amritsar", results.getFirst().getTitle());
+        assertTrue(results.getFirst().getDistanceKm() > 0);
     }
 
     private void stubDatabase() {

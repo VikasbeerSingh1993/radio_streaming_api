@@ -4,9 +4,11 @@ import com.radiostreaming.api.model.AudioLinkDocument;
 import com.radiostreaming.api.model.CategoryDocument;
 import com.radiostreaming.api.model.EventDocument;
 import com.radiostreaming.api.model.StationDocument;
+import com.radiostreaming.api.service.AdminCatalogService;
 import com.radiostreaming.api.service.RadioCacheService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -17,6 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -24,7 +27,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(RadioApiController.class)
+@WebMvcTest(controllers = RadioApiController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class RadioApiControllerTest {
 
     @Autowired
@@ -32,6 +36,9 @@ class RadioApiControllerTest {
 
     @MockitoBean
     private RadioCacheService radioCacheService;
+
+    @MockitoBean
+    private AdminCatalogService adminCatalogService;
 
     @Test
     void healthReturnsOk() throws Exception {
@@ -162,5 +169,46 @@ class RadioApiControllerTest {
                 .andExpect(jsonPath("$.source").value("database"))
                 .andExpect(jsonPath("$.stations").value(3))
                 .andExpect(jsonPath("$.audioLinks").value(65));
+    }
+
+    @Test
+    void nearbyEventsReturnsList() throws Exception {
+        EventDocument event = new EventDocument();
+        event.setId("evt-near");
+        event.setTitle("Local Kirtan");
+        event.setDistanceKm(2.4);
+
+        when(radioCacheService.getNearbyEvents(31.62, 74.876, 50)).thenReturn(List.of(event));
+
+        mockMvc.perform(get("/api/events/nearby")
+                        .param("lat", "31.62")
+                        .param("lng", "74.876"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]._id").value("evt-near"))
+                .andExpect(jsonPath("$[0].distanceKm").value(2.4));
+    }
+
+    @Test
+    void submitEventReturnsCreated() throws Exception {
+        EventDocument saved = new EventDocument();
+        saved.setId("new-event");
+        saved.setApprovalStatus("pending");
+        when(adminCatalogService.submitEvent(any())).thenReturn(saved);
+
+        mockMvc.perform(post("/api/events/submit")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Sangat",
+                                  "date": "2026-09-01T10:00:00Z",
+                                  "city": "Amritsar",
+                                  "submitterName": "Aman",
+                                  "submitterEmail": "aman@example.com"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.id").value("new-event"))
+                .andExpect(jsonPath("$.approvalStatus").value("pending"));
     }
 }

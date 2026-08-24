@@ -3,6 +3,7 @@ package com.radiostreaming.api.model;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
@@ -18,6 +19,7 @@ public class StationDocument {
     private String id;
 
     private String thumbnail;
+    @Indexed
     private String category;
     private Boolean live;
     private String language;
@@ -36,6 +38,9 @@ public class StationDocument {
     @Field("has_played_all_links")
     @JsonProperty("has_played_all_links")
     private Boolean hasPlayedAllLinks;
+
+    @Indexed
+    private String createdBy;
 
     @Field("is_favorite")
     @JsonProperty("is_favorite")
@@ -127,5 +132,13 @@ public class StationDocument {
 
     public void setIsFavorite(Boolean isFavorite) {
         this.isFavorite = isFavorite;
+    }
+
+    public String getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(String createdBy) {
+        this.createdBy = createdBy;
     }
 }

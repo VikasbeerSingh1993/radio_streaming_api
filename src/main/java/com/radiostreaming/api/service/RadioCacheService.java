@@ -4,8 +4,10 @@ import com.radiostreaming.api.model.AudioLinkDocument;
 import com.radiostreaming.api.model.CategoryDocument;
 import com.radiostreaming.api.model.EventDocument;
 import com.radiostreaming.api.model.StationDocument;
+import com.radiostreaming.api.util.GeoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -16,6 +18,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -71,7 +74,52 @@ public class RadioCacheService {
     }
 
     public List<EventDocument> getEvents() {
-        return List.copyOf(ensureLoaded().events);
+        return ensureLoaded().events.stream()
+                .filter(EventDocument::isListedPublicly)
+                .toList();
+    }
+
+    public List<EventDocument> getAllEventsForAdmin() {
+        return List.copyOf(requireSnapshot().events);
+    }
+
+    public List<StationDocument> getStationsForAdmin() {
+        return List.copyOf(requireSnapshot().stations);
+    }
+
+    public List<CategoryDocument> getCategoriesForAdmin() {
+        return List.copyOf(requireSnapshot().categories);
+    }
+
+    public List<AudioLinkDocument> getAllAudioLinksForAdmin() {
+        List<AudioLinkDocument> links = new ArrayList<>();
+        requireSnapshot().audioLinksByStation.values().forEach(links::addAll);
+        return links;
+    }
+
+    public Map<String, StationDocument> stationsByIdForAdmin() {
+        Map<String, StationDocument> map = new LinkedHashMap<>();
+        for (StationDocument station : requireSnapshot().stations) {
+            map.put(RadioDataService.cleanId(station.getId()), station);
+        }
+        return map;
+    }
+
+    public List<EventDocument> getNearbyEvents(double latitude, double longitude, double radiusKm) {
+        double radius = radiusKm <= 0 ? 50 : Math.min(radiusKm, 500);
+        return getEvents().stream()
+                .filter(event -> event.getLatitude() != null && event.getLongitude() != null)
+                .map(event -> {
+                    double distance = GeoUtils.haversineKm(
+                            latitude, longitude, event.getLatitude(), event.getLongitude());
+                    EventDocument copy = new EventDocument();
+                    BeanUtils.copyProperties(event, copy);
+                    copy.setDistanceKm(Math.round(distance * 10.0) / 10.0);
+                    return copy;
+                })
+                .filter(event -> event.getDistanceKm() <= radius)
+                .sorted(Comparator.comparing(EventDocument::getDistanceKm))
+                .toList();
     }
 
     public List<AudioLinkDocument> getAudioLinksByStation(String stationId) {
@@ -118,6 +166,18 @@ public class RadioCacheService {
             return empty;
         }
         return statusOf(current, isExpired(current) ? "expired" : "cache");
+    }
+
+    /**
+     * Admin screens keep serving the last loaded snapshot even after TTL expiry.
+     * They only hit MongoDB when {@link #reloadFromDatabase()} is called.
+     */
+    private Snapshot requireSnapshot() {
+        Snapshot current = snapshot;
+        if (current != null) {
+            return current;
+        }
+        return loadFromDatabase(false);
     }
 
     private Snapshot ensureLoaded() {

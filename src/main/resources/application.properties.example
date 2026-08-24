@@ -3,4 +3,13 @@ server.port=${PORT:8080}
 spring.data.mongodb.uri=${MONGODB_URI:mongodb+srv://USERNAME:PASSWORD@cluster0.example.mongodb.net/divine_bliss_streaming}
 spring.data.mongodb.database=divine_bliss_streaming
 spring.jackson.serialization.write-dates-as-timestamps=false
+spring.data.mongodb.auto-index-creation=true
 app.cache.ttl=24h
+
+# Admin bootstrap. Change these in Railway / production.
+app.admin.username=${ADMIN_USERNAME:admin}
+app.admin.password=${ADMIN_PASSWORD:admin}
+app.admin.reset-password=${ADMIN_RESET_PASSWORD:false}
+app.jwt.secret=${JWT_SECRET:change-this-jwt-secret}
+app.jwt.expiration-ms=28800000
+

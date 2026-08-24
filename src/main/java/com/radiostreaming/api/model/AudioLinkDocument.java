@@ -3,6 +3,7 @@ package com.radiostreaming.api.model;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
@@ -19,6 +20,7 @@ public class AudioLinkDocument {
 
     @Field("station_id")
     @JsonProperty("station_id")
+    @Indexed
     private String stationId;
 
     private String url;
@@ -26,6 +28,9 @@ public class AudioLinkDocument {
     private Map<String, Map<String, String>> translations;
     private Boolean played;
     private String status;
+
+    @Indexed
+    private String createdBy;
 
     @Field("created_at")
     @JsonProperty("created_at")
@@ -93,5 +98,13 @@ public class AudioLinkDocument {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(String createdBy) {
+        this.createdBy = createdBy;
     }
 }

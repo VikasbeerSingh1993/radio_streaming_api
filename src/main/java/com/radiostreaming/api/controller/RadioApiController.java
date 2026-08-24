@@ -1,13 +1,18 @@
 package com.radiostreaming.api.controller;
 
+import com.radiostreaming.api.dto.EventSubmitRequest;
 import com.radiostreaming.api.model.AudioLinkDocument;
 import com.radiostreaming.api.model.CategoryDocument;
 import com.radiostreaming.api.model.EventDocument;
 import com.radiostreaming.api.model.StationDocument;
+import com.radiostreaming.api.service.AdminCatalogService;
 import com.radiostreaming.api.service.RadioCacheService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -16,9 +21,11 @@ import java.util.Map;
 public class RadioApiController {
 
     private final RadioCacheService radioCacheService;
+    private final AdminCatalogService adminCatalogService;
 
-    public RadioApiController(RadioCacheService radioCacheService) {
+    public RadioApiController(RadioCacheService radioCacheService, AdminCatalogService adminCatalogService) {
         this.radioCacheService = radioCacheService;
+        this.adminCatalogService = adminCatalogService;
     }
 
     @GetMapping("/health")
@@ -52,6 +59,26 @@ public class RadioApiController {
     @GetMapping("/events")
     public List<EventDocument> getEvents() {
         return radioCacheService.getEvents();
+    }
+
+    @GetMapping("/events/nearby")
+    public List<EventDocument> getNearbyEvents(
+            @RequestParam double lat,
+            @RequestParam double lng,
+            @RequestParam(defaultValue = "50") double radiusKm) {
+        return radioCacheService.getNearbyEvents(lat, lng, radiusKm);
+    }
+
+    @PostMapping("/events/submit")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Map<String, Object> submitEvent(@Valid @RequestBody EventSubmitRequest request) {
+        EventDocument saved = adminCatalogService.submitEvent(request);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("success", true);
+        body.put("id", saved.getId());
+        body.put("approvalStatus", saved.getApprovalStatus());
+        body.put("message", "Event submitted for admin approval");
+        return body;
     }
 
     @GetMapping("/audio-links/station/{stationId}")

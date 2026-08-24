@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="adminApp" ng-controller="ShellCtrl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Radio Streaming Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin/css/admin.css">
+</head>
+<body>
+  <div class="login-wrap" ng-if="!isAuthed">
+    <form class="login-card" ng-submit="login()">
+      <div class="brand-mark">RS</div>
+      <h1>Admin Console</h1>
+      <p>Sign in to review events and manage catalog data.</p>
+      <div class="alert" ng-if="auth.error">{{auth.error}}</div>
+      <label class="field">
+        <span>Username</span>
+        <input type="text" ng-model="auth.username" autocomplete="username" required>
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input type="password" ng-model="auth.password" autocomplete="current-password" required>
+      </label>
+      <button class="btn btn-primary" type="submit" ng-disabled="auth.loading">
+        {{auth.loading ? 'Signing in…' : 'Sign in'}}
+      </button>
+    </form>
+  </div>
+
+  <div class="layout" ng-if="isAuthed">
+    <div class="overlay" ng-class="{show: sidebarOpen}" ng-click="closeSidebar()"></div>
+    <aside class="sidebar" ng-class="{open: sidebarOpen}">
+      <div class="sidebar-brand">
+        <div class="brand-mark">RS</div>
+        <div>
+          <h2>Radio Admin</h2>
+          <small>Content control</small>
+        </div>
+      </div>
+      <a class="nav-link" href="#/dashboard" ng-class="{active: isActive('/dashboard')}" ng-click="closeSidebar()">Dashboard</a>
+      <a class="nav-link" href="#/events" ng-if="can('events','read')" ng-class="{active: isActive('/events')}" ng-click="closeSidebar()">Events</a>
+      <a class="nav-link" href="#/stations" ng-if="can('stations','read')" ng-class="{active: isActive('/stations')}" ng-click="closeSidebar()">Stations</a>
+      <a class="nav-link" href="#/categories" ng-if="can('categories','read')" ng-class="{active: isActive('/categories')}" ng-click="closeSidebar()">Categories</a>
+      <a class="nav-link" href="#/links" ng-if="can('audioLinks','read')" ng-class="{active: isActive('/links')}" ng-click="closeSidebar()">Audio links</a>
+      <a class="nav-link" href="#/users" ng-if="can('users','read')" ng-class="{active: isActive('/users')}" ng-click="closeSidebar()">Sub-admins</a>
+    </aside>
+    <section class="main">
+      <header class="topbar">
+        <button class="hamburger" type="button" ng-click="toggleSidebar()">Menu</button>
+        <div>
+          <strong>{{profile.displayName || profile.username}}</strong>
+          <div class="muted">{{profile.superAdmin ? 'Super admin' : 'Sub-admin'}} <span ng-if="profile.organization">· {{profile.organization}}</span></div>
+        </div>
+        <button class="btn btn-ghost btn-sm" type="button" ng-click="logout()">Sign out</button>
+      </header>
+      <div class="flash" ng-class="{error: $root.flash.error}" ng-if="$root.flash" ng-click="clearFlash()">{{$root.flash.text}}</div>
+      <div class="page" ng-view></div>
+    </section>
+  </div>
+
+  <script type="text/ng-template" id="dashboard.html">
+    <div class="page-head">
+      <div>
+        <h1>Dashboard</h1>
+        <div class="muted">Cached catalog for your access. Refresh only when you need a live MongoDB snapshot.</div>
+      </div>
+      <button class="btn btn-info btn-sm" ng-click="refresh()">Refresh from database</button>
+    </div>
+    <div class="stats">
+      <div class="stat-card"><span>Pending events</span><strong>{{stats.pendingEvents || 0}}</strong></div>
+      <div class="stat-card"><span>Approved events</span><strong>{{stats.approvedEvents || 0}}</strong></div>
+      <div class="stat-card"><span>Stations</span><strong>{{stats.stations || 0}}</strong></div>
+      <div class="stat-card"><span>Audio links</span><strong>{{stats.audioLinks || 0}}</strong></div>
+    </div>
+    <div class="panel">
+      <p class="cache-meta">Source: {{stats.cacheSource || 'cache'}} <span ng-if="stats.cacheLoadedAt">· loaded {{stats.cacheLoadedAt}}</span></p>
+      <p class="muted">Create sub-admins with independent Read / Add / Edit / Delete rights. You can also limit them to selected categories and organizations (for example only Dodra events).</p>
+    </div>
+  </script>
+
+  <script type="text/ng-template" id="events.html">
+    <div class="page-head">
+      <div>
+        <h1>Events</h1>
+        <div class="muted">Approve community submissions or publish your own.</div>
+      </div>
+      <button class="btn btn-primary btn-sm" ng-if="can('events','create')" ng-click="openCreate()">New event</button>
+    </div>
+    <div class="toolbar">
+      <input class="search-input" placeholder="Search title, city, organization, submitter" ng-model="query" ng-keyup="$event.keyCode==13 && search()">
+      <button class="btn btn-ghost btn-sm" ng-click="search()">Search</button>
+      <button class="btn btn-info btn-sm icon-btn" title="Refresh from database" ng-click="refresh()" ng-disabled="refreshing">↻</button>
+    </div>
+    <div class="filters">
+      <button class="chip" ng-class="{active: filter==='pending'}" ng-click="filter='pending'">Pending</button>
+      <button class="chip" ng-class="{active: filter==='approved'}" ng-click="filter='approved'">Approved</button>
+      <button class="chip" ng-class="{active: filter==='rejected'}" ng-click="filter='rejected'">Rejected</button>
+      <button class="chip" ng-class="{active: filter==='all'}" ng-click="filter='all'">All</button>
+    </div>
+    <div class="panel table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Event</th>
+            <th>When</th>
+            <th>Submitter</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr ng-repeat="event in filtered()">
+            <td>
+              <strong>{{event.title}}</strong>
+              <div class="muted">{{event.city}} · {{event.address}}</div>
+              <div class="muted" ng-if="event.organizedBy">By {{event.organizedBy}}</div>
+            </td>
+            <td>{{event.date | date:'medium'}}</td>
+            <td>
+              <div>{{event.submitterName || 'Admin'}}</div>
+              <div class="muted">{{event.submitterEmail}}</div>
+            </td>
+            <td>
+              <span class="badge" ng-class="'badge-' + ((event.approvalStatus || 'approved') | lowercase)">
+                {{event.approvalStatus || 'approved'}}
+              </span>
+            </td>
+            <td class="row-actions">
+              <button class="btn btn-success btn-sm" ng-if="can('events','approve') && event.approvalStatus==='pending'" ng-click="approve(event)">Approve</button>
+              <button class="btn btn-danger btn-sm" ng-if="can('events','approve') && event.approvalStatus==='pending'" ng-click="reject(event)">Reject</button>
+              <button class="btn btn-ghost btn-sm" ng-if="can('events','update')" ng-click="openEdit(event)">Edit</button>
+              <button class="btn btn-danger btn-sm" ng-if="can('events','delete')" ng-click="remove(event)">Delete</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="muted" ng-if="!filtered().length">No events in this view.</p>
+    </div>
+
+    <div class="modal-backdrop" ng-if="form">
+      <form class="modal" ng-submit="save()">
+        <h2>{{form._id ? 'Edit event' : 'New event'}}</h2>
+        <div class="grid-2">
+          <label class="field"><span>Title</span><input ng-model="form.title" required></label>
+          <label class="field"><span>City</span><input ng-model="form.city" required></label>
+          <label class="field"><span>Start</span><input type="datetime-local" ng-model="form.date" required></label>
+          <label class="field"><span>End</span><input type="datetime-local" ng-model="form.end_date"></label>
+          <label class="field"><span>Venue</span><input ng-model="form.address"></label>
+          <label class="field"><span>Organized by</span><input ng-model="form.organizedBy"></label>
+          <label class="field"><span>Organization</span><input ng-model="form.organization" placeholder="e.g. dodra"></label>
+          <label class="field"><span>Category key</span><input ng-model="form.category" placeholder="optional scope"></label>
+          <label class="field"><span>Latitude</span><input type="number" step="any" ng-model="form.latitude"></label>
+          <label class="field"><span>Longitude</span><input type="number" step="any" ng-model="form.longitude"></label>
+          <label class="field">
+            <span>Approval</span>
+            <select ng-model="form.approvalStatus">
+              <option value="pending">pending</option>
+              <option value="approved">approved</option>
+              <option value="rejected">rejected</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Schedule status</span>
+            <select ng-model="form.status">
+              <option value="scheduled">scheduled</option>
+              <option value="canceled">canceled</option>
+            </select>
+          </label>
+        </div>
+        <label class="field"><span>Description</span><textarea ng-model="form.description"></textarea></label>
+        <label class="field"><span>Review note</span><input ng-model="form.reviewNote"></label>
+        <div class="row-actions">
+          <button class="btn btn-primary btn-sm" type="submit">Save</button>
+          <button class="btn btn-ghost btn-sm" type="button" ng-click="form=null">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </script>
+
+  <script type="text/ng-template" id="stations.html">
+    <div class="page-head">
+      <div>
+        <h1>Stations</h1>
+        <div class="muted">Manage radio stations shown in the app.</div>
+      </div>
+      <button class="btn btn-primary btn-sm" ng-if="can('stations','create')" ng-click="openCreate()">New station</button>
+    </div>
+    <div class="toolbar">
+      <input class="search-input" placeholder="Search stations" ng-model="query" ng-keyup="$event.keyCode==13 && search()">
+      <button class="btn btn-ghost btn-sm" ng-click="search()">Search</button>
+      <button class="btn btn-info btn-sm icon-btn" title="Refresh from database" ng-click="refresh()" ng-disabled="refreshing">↻</button>
+    </div>
+    <div class="panel table-wrap">
+      <table>
+        <thead><tr><th>Name</th><th>Category</th><th>Language</th><th>Live</th><th></th></tr></thead>
+        <tbody>
+          <tr ng-repeat="station in stations">
+            <td><strong>{{station | stationName}}</strong></td>
+            <td>{{station.category}}</td>
+            <td>{{station.language}}</td>
+            <td>{{station.live ? 'Yes' : 'No'}}</td>
+            <td class="row-actions">
+              <button class="btn btn-ghost btn-sm" ng-if="can('stations','update')" ng-click="openEdit(station)">Edit</button>
+              <button class="btn btn-danger btn-sm" ng-if="can('stations','delete')" ng-click="remove(station)">Delete</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-backdrop" ng-if="form">
+      <form class="modal" ng-submit="save()">
+        <h2>{{form._id ? 'Edit station' : 'New station'}}</h2>
+        <div class="grid-2">
+          <label class="field"><span>English name</span><input ng-model="form.nameEn" required></label>
+          <label class="field"><span>Hindi name</span><input ng-model="form.nameHi"></label>
+          <label class="field">
+            <span>Category key</span>
+            <select ng-model="form.category">
+              <option ng-repeat="cat in categories" value="{{cat.category}}">{{cat.category}}</option>
+            </select>
+          </label>
+          <label class="field"><span>Language</span><input ng-model="form.language"></label>
+          <label class="field"><span>Play mode</span><input ng-model="form.play_mode"></label>
+          <label class="field"><span>Type</span><input ng-model="form.type"></label>
+          <label class="field"><span>Thumbnail URL</span><input ng-model="form.thumbnail"></label>
+          <label class="field"><span>Live</span><select ng-model="form.live" ng-options="v as (v?'Yes':'No') for v in [true,false]"></select></label>
+        </div>
+        <div class="row-actions">
+          <button class="btn btn-primary btn-sm" type="submit">Save</button>
+          <button class="btn btn-ghost btn-sm" type="button" ng-click="form=null">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </script>
+
+  <script type="text/ng-template" id="categories.html">
+    <div class="page-head">
+      <div>
+        <h1>Categories</h1>
+        <div class="muted">Control station grouping in the app.</div>
+      </div>
+      <button class="btn btn-primary btn-sm" ng-if="can('categories','create')" ng-click="openCreate()">New category</button>
+    </div>
+    <div class="toolbar">
+      <input class="search-input" placeholder="Search categories" ng-model="query" ng-keyup="$event.keyCode==13 && search()">
+      <button class="btn btn-ghost btn-sm" ng-click="search()">Search</button>
+      <button class="btn btn-info btn-sm icon-btn" title="Refresh from database" ng-click="refresh()" ng-disabled="refreshing">↻</button>
+    </div>
+    <div class="panel table-wrap">
+      <table>
+        <thead><tr><th>Key</th><th>Name</th><th>Order</th><th></th></tr></thead>
+        <tbody>
+          <tr ng-repeat="category in categories">
+            <td>{{category.category}}</td>
+            <td>{{(category.translations && category.translations.en && category.translations.en.name) || category.category}}</td>
+            <td>{{category.order}}</td>
+            <td class="row-actions">
+              <button class="btn btn-ghost btn-sm" ng-if="can('categories','update')" ng-click="openEdit(category)">Edit</button>
+              <button class="btn btn-danger btn-sm" ng-if="can('categories','delete')" ng-click="remove(category)">Delete</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-backdrop" ng-if="form">
+      <form class="modal" ng-submit="save()">
+        <h2>{{form._id ? 'Edit category' : 'New category'}}</h2>
+        <div class="grid-2">
+          <label class="field"><span>Key</span><input ng-model="form.category" required></label>
+          <label class="field"><span>Order</span><input type="number" ng-model="form.order"></label>
+          <label class="field"><span>English name</span><input ng-model="form.nameEn" required></label>
+          <label class="field"><span>Hindi name</span><input ng-model="form.nameHi"></label>
+          <label class="field"><span>Icon</span><input ng-model="form.icon"></label>
+        </div>
+        <div class="row-actions">
+          <button class="btn btn-primary btn-sm" type="submit">Save</button>
+          <button class="btn btn-ghost btn-sm" type="button" ng-click="form=null">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </script>
+
+  <script type="text/ng-template" id="links.html">
+    <div class="page-head">
+      <div>
+        <h1>Audio links</h1>
+        <div class="muted">Playlist URLs attached to each station.</div>
+      </div>
+      <button class="btn btn-primary btn-sm" ng-if="can('audioLinks','create')" ng-click="openCreate()">New link</button>
+    </div>
+    <div class="toolbar">
+      <input class="search-input" placeholder="Search titles or URLs" ng-model="query" ng-keyup="$event.keyCode==13 && search()">
+      <button class="btn btn-ghost btn-sm" ng-click="search()">Search</button>
+      <button class="btn btn-info btn-sm icon-btn" title="Refresh from database" ng-click="refresh()" ng-disabled="refreshing">↻</button>
+    </div>
+    <div class="filters">
+      <select class="search-input" ng-model="stationFilter">
+        <option value="">All stations</option>
+        <option ng-repeat="station in stations" value="{{station._id}}">{{station | stationName}}</option>
+      </select>
+    </div>
+    <div class="panel table-wrap">
+      <table>
+        <thead><tr><th>Title</th><th>Station</th><th>Sequence</th><th>URL</th><th></th></tr></thead>
+        <tbody>
+          <tr ng-repeat="link in filtered()">
+            <td>{{(link.translations && link.translations.en && link.translations.en.name) || 'Track'}}</td>
+            <td>{{link.station_id}}</td>
+            <td>{{link.sequence}}</td>
+            <td class="muted">{{link.url}}</td>
+            <td class="row-actions">
+              <button class="btn btn-ghost btn-sm" ng-if="can('audioLinks','update')" ng-click="openEdit(link)">Edit</button>
+              <button class="btn btn-danger btn-sm" ng-if="can('audioLinks','delete')" ng-click="remove(link)">Delete</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-backdrop" ng-if="form">
+      <form class="modal" ng-submit="save()">
+        <h2>{{form._id ? 'Edit link' : 'New link'}}</h2>
+        <div class="grid-2">
+          <label class="field"><span>Title</span><input ng-model="form.nameEn" required></label>
+          <label class="field">
+            <span>Station</span>
+            <select ng-model="form.station_id" required>
+              <option ng-repeat="station in stations" value="{{station._id}}">{{station | stationName}}</option>
+            </select>
+          </label>
+          <label class="field"><span>Sequence</span><input type="number" ng-model="form.sequence"></label>
+          <label class="field"><span>URL</span><input ng-model="form.url" required></label>
+        </div>
+        <div class="row-actions">
+          <button class="btn btn-primary btn-sm" type="submit">Save</button>
+          <button class="btn btn-ghost btn-sm" type="button" ng-click="form=null">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </script>
+
+  <script type="text/ng-template" id="users.html">
+    <div class="page-head">
+      <div>
+        <h1>Sub-admins</h1>
+        <div class="muted">Grant only the modules, categories, and actions each person needs.</div>
+      </div>
+      <button class="btn btn-primary btn-sm" ng-if="can('users','create')" ng-click="openCreate()">New sub-admin</button>
+    </div>
+    <div class="toolbar">
+      <input class="search-input" placeholder="Search username, organization, role" ng-model="query" ng-keyup="$event.keyCode==13 && search()">
+      <button class="btn btn-ghost btn-sm" ng-click="search()">Search</button>
+      <button class="btn btn-info btn-sm icon-btn" title="Refresh from database" ng-click="refresh()" ng-disabled="refreshing">↻</button>
+    </div>
+    <div class="panel table-wrap">
+      <table>
+        <thead><tr><th>User</th><th>Role</th><th>Organization</th><th>Access</th><th></th></tr></thead>
+        <tbody>
+          <tr ng-repeat="user in users">
+            <td>
+              <strong>{{user.displayName || user.username}}</strong>
+              <div class="muted">{{user.username}}</div>
+            </td>
+            <td><span class="role-pill">{{user.role}}</span></td>
+            <td>{{user.organization || '—'}}</td>
+            <td class="muted">
+              <span ng-if="user.superAdmin">Full access</span>
+              <span ng-if="!user.superAdmin && user.ownRecordsOnly">Own records only</span>
+              <span ng-if="!user.superAdmin && user.allowedCategoryKeys.length"> · {{user.allowedCategoryKeys.join(', ')}}</span>
+              <span ng-if="!user.superAdmin && user.allowedOrganizations.length"> · org {{user.allowedOrganizations.join(', ')}}</span>
+            </td>
+            <td class="row-actions">
+              <button class="btn btn-ghost btn-sm" ng-if="can('users','update')" ng-click="openEdit(user)">Edit</button>
+              <button class="btn btn-danger btn-sm" ng-if="can('users','delete')" ng-click="remove(user)">Delete</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-backdrop" ng-if="form">
+      <form class="modal" ng-submit="save()">
+        <h2>{{form.id ? 'Edit user' : 'New sub-admin'}}</h2>
+        <div class="grid-2">
+          <label class="field"><span>Username</span><input ng-model="form.username" required ng-disabled="!!form.id"></label>
+          <label class="field"><span>Password</span><input type="password" ng-model="form.password" ng-required="!form.id" placeholder="{{form.id ? 'Leave blank to keep' : 'Min 8 characters'}}"></label>
+          <label class="field"><span>Display name</span><input ng-model="form.displayName"></label>
+          <label class="field"><span>Home organization</span><input ng-model="form.organization" placeholder="e.g. dodra"></label>
+        </div>
+        <label class="field">
+          <span>Role</span>
+          <select ng-model="form.role">
+            <option value="SUB_ADMIN">Sub-admin (limited)</option>
+            <option value="SUPER_ADMIN">Super admin (full access)</option>
+          </select>
+        </label>
+        <label class="check-pill"><input type="checkbox" ng-model="form.enabled"> Account enabled</label>
+        <label class="check-pill"><input type="checkbox" ng-model="form.ownRecordsOnly"> Only records they create</label>
+        <div ng-if="form.role!=='SUPER_ADMIN'">
+          <h3>Permissions</h3>
+          <p class="muted">Tick Read to see a page. Add / Edit / Delete are independent, so you can allow editing without delete.</p>
+          <div class="table-wrap">
+            <table class="perm-table">
+              <thead>
+                <tr><th>Module</th><th>Read</th><th>Add</th><th>Edit</th><th>Delete</th><th>Approve</th></tr>
+              </thead>
+              <tbody>
+                <tr ng-repeat="mod in modules">
+                  <td>{{mod.label}}</td>
+                  <td><input type="checkbox" ng-model="form.permissions[mod.key].read"></td>
+                  <td><input type="checkbox" ng-model="form.permissions[mod.key].create"></td>
+                  <td><input type="checkbox" ng-model="form.permissions[mod.key].update"></td>
+                  <td><input type="checkbox" ng-model="form.permissions[mod.key].delete"></td>
+                  <td><input type="checkbox" ng-if="mod.approve" ng-model="form.permissions[mod.key].approve"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <label class="field">
+            <span>Allowed organizations (comma separated)</span>
+            <input ng-model="form.allowedOrganizationsText" placeholder="dodra, amritsar">
+          </label>
+          <div class="field">
+            <span>Allowed categories (stations &amp; links follow these)</span>
+            <div class="check-grid">
+              <label class="check-pill" ng-repeat="cat in categories">
+                <input type="checkbox" ng-checked="hasCategory(cat.category)" ng-click="toggleCategory(cat.category)">
+                {{cat.category}}
+              </label>
+              <span class="muted" ng-if="!categories.length">Leave empty to allow every category they can read.</span>
+            </div>
+          </div>
+        </div>
+        <div class="row-actions" style="margin-top:16px">
+          <button class="btn btn-primary btn-sm" type="submit">Save</button>
+          <button class="btn btn-ghost btn-sm" type="button" ng-click="form=null">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.8.3/angular.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.8.3/angular-route.min.js"></script>
+  <script src="/admin/js/app.js"></script>
+</body>
+</html>
