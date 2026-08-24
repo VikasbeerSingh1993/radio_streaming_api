@@ -16,7 +16,7 @@
   --radius: 16px;
 }
 
-* { box-sizing: border-box; }
+[ng-cloak], .ng-cloak { display: none !important; }
 
 html, body {
   margin: 0;
