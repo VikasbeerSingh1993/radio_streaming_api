@@ -123,6 +123,7 @@ public class AdminAccessService {
                     event.getOrganization(),
                     event.getCategory(),
                     event.getSubmitterName(),
+                    event.getSubmitterUsername(),
                     event.getSubmitterEmail(),
                     event.getCreatedBy(),
                     event.getDescription()));

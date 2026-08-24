@@ -76,10 +76,14 @@ Indexes are created automatically (`spring.data.mongodb.auto-index-creation=true
 
 ## Event approval flow
 
-1. The app posts `POST /api/events/submit`. The event is stored as `approvalStatus: pending`.
-2. Public `GET /api/events` and nearby search return only **approved** events (legacy rows with a blank status are treated as approved).
-3. An admin with Approve permission reviews the event in the admin console and **Approve** or **Reject**.
-4. Admins can also create events directly as approved.
+1. The app collects event details plus **username** and **email**.
+2. `POST /api/events/submit` stores a draft and emails a 6-digit OTP. The event is **not** created yet.
+3. The user enters the code. `POST /api/events/submit/verify` checks it, then creates the event as `approvalStatus: pending`.
+4. Public `GET /api/events` and nearby search return only **approved** events (legacy rows with a blank status are treated as approved).
+5. An admin with Approve permission reviews the event and **Approve** or **Reject**.
+6. Admins can also create events directly as approved.
+
+OTP codes expire in 10 minutes, drafts expire in 30 minutes, resend waits 60 seconds, and verification is limited to 5 attempts. The code is hashed; it is never returned in the API response.
 
 Submit body (ISO-8601 dates):
 
@@ -93,7 +97,8 @@ Submit body (ISO-8601 dates):
   "latitude": 31.634,
   "longitude": 74.872,
   "organizedBy": "Dodra",
-  "submitterName": "Name",
+  "username": "aman",
+  "submitterName": "Aman Singh",
   "submitterEmail": "user@example.com",
   "submitterPhone": "+91..."
 }
@@ -148,7 +153,9 @@ You can also:
 | GET | `/api/categories` | All categories (cache) |
 | GET | `/api/events` | Approved / public events (cache) |
 | GET | `/api/events/nearby?lat=&lng=&radiusKm=50` | Approved events within radius (max 500 km) |
-| POST | `/api/events/submit` | User submission (`pending`) |
+| POST | `/api/events/submit` | Start submit: save draft and email OTP |
+| POST | `/api/events/submit/verify` | Verify OTP, then create pending event |
+| POST | `/api/events/submit/resend` | Resend OTP for a draft |
 | GET | `/api/audio-links/station/{stationId}` | Audio links for a station (cache) |
 | PUT | `/api/audio-links/{linkId}/played` | `{"played": true}` |
 | POST | `/api/audio-links/station/{stationId}/reset` | Mark all links unplayed |
@@ -191,6 +198,12 @@ Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/admin/login -Conte
 | `ADMIN_PASSWORD` | No | `admin` | Seeded super-admin password |
 | `ADMIN_RESET_PASSWORD` | No | `false` | Set `true` once to reset the seed password |
 | `JWT_SECRET` | Yes (prod) | dev placeholder | Must be a long random string in production |
+| `MAIL_HOST` | Yes (prod) | unset | SMTP host, e.g. `smtp.gmail.com` |
+| `MAIL_PORT` | No | `587` | SMTP port |
+| `MAIL_USERNAME` | Yes (prod) | unset | SMTP username |
+| `MAIL_PASSWORD` | Yes (prod) | unset | SMTP password or app password |
+| `MAIL_FROM` | No | `MAIL_USERNAME` | From address on OTP emails |
+| `MAIL_LOG_OTP` | No | `false` | Set `true` only in local dev to log OTPs when mail is unset |
 | `app.cache.ttl` | No | `24h` | How long the in-memory snapshot is considered fresh |
 
 Do not commit real Mongo URIs or production passwords.
@@ -233,6 +246,11 @@ This repo is wired for Railway:
    | `ADMIN_USERNAME` | Super-admin username |
    | `ADMIN_PASSWORD` | Super-admin password |
    | `JWT_SECRET` | Long random string |
+   | `MAIL_HOST` | SMTP host (`smtp.gmail.com`) |
+   | `MAIL_PORT` | `587` |
+   | `MAIL_USERNAME` | SMTP username |
+   | `MAIL_PASSWORD` | SMTP password or Gmail app password |
+   | `MAIL_FROM` | From address for OTP emails |
    | `ADMIN_RESET_PASSWORD` | `true` only when you need to reset the seed user |
 
 3. In **Settings → Networking**, generate a public domain.

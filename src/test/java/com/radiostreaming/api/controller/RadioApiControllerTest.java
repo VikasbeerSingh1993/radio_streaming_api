@@ -4,7 +4,7 @@ import com.radiostreaming.api.model.AudioLinkDocument;
 import com.radiostreaming.api.model.CategoryDocument;
 import com.radiostreaming.api.model.EventDocument;
 import com.radiostreaming.api.model.StationDocument;
-import com.radiostreaming.api.service.AdminCatalogService;
+import com.radiostreaming.api.service.EventSubmissionService;
 import com.radiostreaming.api.service.RadioCacheService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,7 +38,7 @@ class RadioApiControllerTest {
     private RadioCacheService radioCacheService;
 
     @MockitoBean
-    private AdminCatalogService adminCatalogService;
+    private EventSubmissionService eventSubmissionService;
 
     @Test
     void healthReturnsOk() throws Exception {
@@ -189,11 +189,13 @@ class RadioApiControllerTest {
     }
 
     @Test
-    void submitEventReturnsCreated() throws Exception {
-        EventDocument saved = new EventDocument();
-        saved.setId("new-event");
-        saved.setApprovalStatus("pending");
-        when(adminCatalogService.submitEvent(any())).thenReturn(saved);
+    void startEventSubmitReturnsOtpChallenge() throws Exception {
+        when(eventSubmissionService.start(any())).thenReturn(Map.of(
+                "success", true,
+                "submissionId", "sub-1",
+                "email", "a***n@example.com",
+                "message", "We sent a verification code to your email."
+        ));
 
         mockMvc.perform(post("/api/events/submit")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -202,8 +204,29 @@ class RadioApiControllerTest {
                                   "title": "Sangat",
                                   "date": "2026-09-01T10:00:00Z",
                                   "city": "Amritsar",
-                                  "submitterName": "Aman",
+                                  "username": "aman",
                                   "submitterEmail": "aman@example.com"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.submissionId").value("sub-1"))
+                .andExpect(jsonPath("$.email").value("a***n@example.com"));
+    }
+
+    @Test
+    void verifyEventSubmitCreatesPendingEvent() throws Exception {
+        EventDocument saved = new EventDocument();
+        saved.setId("new-event");
+        saved.setApprovalStatus("pending");
+        when(eventSubmissionService.verify("sub-1", "123456")).thenReturn(saved);
+
+        mockMvc.perform(post("/api/events/submit/verify")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "submissionId": "sub-1",
+                                  "otp": "123456"
                                 }
                                 """))
                 .andExpect(status().isCreated())

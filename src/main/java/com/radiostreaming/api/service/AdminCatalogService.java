@@ -75,6 +75,10 @@ public class AdminCatalogService {
         return body;
     }
 
+    public EventDocument submitVerifiedEvent(EventSubmitRequest request) {
+        return submitEvent(request);
+    }
+
     public EventDocument submitEvent(EventSubmitRequest request) {
         EventDocument event = new EventDocument();
         event.setTitle(request.getTitle().trim());
@@ -89,9 +93,13 @@ public class AdminCatalogService {
         event.setOrganization(trimToEmpty(request.getOrganizedBy()));
         event.setStatus("scheduled");
         event.setApprovalStatus("pending");
-        event.setSubmitterName(trimToEmpty(request.getSubmitterName()));
+        String username = trimToEmpty(request.getSubmitterUsername());
+        String name = trimToEmpty(request.getSubmitterName());
+        event.setSubmitterUsername(username);
+        event.setSubmitterName(name.isBlank() ? username : name);
         event.setSubmitterEmail(trimToEmpty(request.getSubmitterEmail()));
         event.setSubmitterPhone(trimToEmpty(request.getSubmitterPhone()));
+        event.setEmailVerified(true);
         event.setSubmittedAt(Instant.now());
         event.setCreatedBy("public");
         EventDocument saved = eventRepository.save(event);

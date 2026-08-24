@@ -66,8 +66,10 @@ public class EventDocument {
     private String approvalStatus;
 
     private String submitterName;
+    private String submitterUsername;
     private String submitterEmail;
     private String submitterPhone;
+    private boolean emailVerified;
     private Instant submittedAt;
     private Instant reviewedAt;
     private String reviewNote;
@@ -201,6 +203,14 @@ public class EventDocument {
         this.submitterName = submitterName;
     }
 
+    public String getSubmitterUsername() {
+        return submitterUsername;
+    }
+
+    public void setSubmitterUsername(String submitterUsername) {
+        this.submitterUsername = submitterUsername;
+    }
+
     public String getSubmitterEmail() {
         return submitterEmail;
     }
@@ -215,6 +225,14 @@ public class EventDocument {
 
     public void setSubmitterPhone(String submitterPhone) {
         this.submitterPhone = submitterPhone;
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerified;
+    }
+
+    public void setEmailVerified(boolean emailVerified) {
+        this.emailVerified = emailVerified;
     }
 
     public Instant getSubmittedAt() {

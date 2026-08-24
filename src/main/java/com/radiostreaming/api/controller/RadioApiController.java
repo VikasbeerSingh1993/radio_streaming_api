@@ -1,11 +1,13 @@
 package com.radiostreaming.api.controller;
 
 import com.radiostreaming.api.dto.EventSubmitRequest;
+import com.radiostreaming.api.dto.EventSubmitResendRequest;
+import com.radiostreaming.api.dto.EventSubmitVerifyRequest;
 import com.radiostreaming.api.model.AudioLinkDocument;
 import com.radiostreaming.api.model.CategoryDocument;
 import com.radiostreaming.api.model.EventDocument;
 import com.radiostreaming.api.model.StationDocument;
-import com.radiostreaming.api.service.AdminCatalogService;
+import com.radiostreaming.api.service.EventSubmissionService;
 import com.radiostreaming.api.service.RadioCacheService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -21,11 +23,13 @@ import java.util.Map;
 public class RadioApiController {
 
     private final RadioCacheService radioCacheService;
-    private final AdminCatalogService adminCatalogService;
+    private final EventSubmissionService eventSubmissionService;
 
-    public RadioApiController(RadioCacheService radioCacheService, AdminCatalogService adminCatalogService) {
+    public RadioApiController(
+            RadioCacheService radioCacheService,
+            EventSubmissionService eventSubmissionService) {
         this.radioCacheService = radioCacheService;
-        this.adminCatalogService = adminCatalogService;
+        this.eventSubmissionService = eventSubmissionService;
     }
 
     @GetMapping("/health")
@@ -70,15 +74,25 @@ public class RadioApiController {
     }
 
     @PostMapping("/events/submit")
+    public Map<String, Object> startEventSubmit(@Valid @RequestBody EventSubmitRequest request) {
+        return eventSubmissionService.start(request);
+    }
+
+    @PostMapping("/events/submit/verify")
     @ResponseStatus(HttpStatus.CREATED)
-    public Map<String, Object> submitEvent(@Valid @RequestBody EventSubmitRequest request) {
-        EventDocument saved = adminCatalogService.submitEvent(request);
+    public Map<String, Object> verifyEventSubmit(@Valid @RequestBody EventSubmitVerifyRequest request) {
+        EventDocument saved = eventSubmissionService.verify(request.getSubmissionId(), request.getOtp());
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("success", true);
         body.put("id", saved.getId());
         body.put("approvalStatus", saved.getApprovalStatus());
-        body.put("message", "Event submitted for admin approval");
+        body.put("message", "Email verified. Event submitted for admin approval");
         return body;
+    }
+
+    @PostMapping("/events/submit/resend")
+    public Map<String, Object> resendEventOtp(@Valid @RequestBody EventSubmitResendRequest request) {
+        return eventSubmissionService.resend(request.getSubmissionId());
     }
 
     @GetMapping("/audio-links/station/{stationId}")

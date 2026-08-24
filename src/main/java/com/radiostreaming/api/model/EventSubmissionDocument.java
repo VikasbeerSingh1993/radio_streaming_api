@@ -1,49 +1,47 @@
-package com.radiostreaming.api.dto;
+package com.radiostreaming.api.model;
 
-import com.fasterxml.jackson.annotation.JsonAlias;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
-public class EventSubmitRequest {
+@Document(collection = "event_submissions")
+public class EventSubmissionDocument {
 
-    @NotBlank
+    @Id
+    private String id;
+
     private String title;
-
-    @NotNull
     private Instant date;
-
-    @JsonAlias({"endDate", "end_date"})
     private Instant endDate;
-
-    @NotBlank
     private String city;
-
     private String description;
     private String address;
     private Double latitude;
     private Double longitude;
     private String organizedBy;
-
-    @NotBlank
-    @jakarta.validation.constraints.Size(min = 3, max = 40)
-    @jakarta.validation.constraints.Pattern(
-            regexp = "[A-Za-z0-9._-]+",
-            message = "Username may only contain letters, numbers, dots, underscores, and hyphens")
-    @JsonAlias({"username", "submitterUsername"})
     private String submitterUsername;
-
-    @JsonAlias({"name", "fullName"})
     private String submitterName;
-
-    @NotBlank
-    @Email
-    @JsonAlias({"email"})
     private String submitterEmail;
-
     private String submitterPhone;
+    private String otpHash;
+    private Instant otpExpiresAt;
+    private Instant lastSentAt;
+    private int sendCount;
+    private int verifyAttempts;
+    private boolean consumed;
+
+    @Indexed(expireAfterSeconds = 0)
+    private Instant expiresAt;
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
 
     public String getTitle() {
         return title;
@@ -147,5 +145,61 @@ public class EventSubmitRequest {
 
     public void setSubmitterPhone(String submitterPhone) {
         this.submitterPhone = submitterPhone;
+    }
+
+    public String getOtpHash() {
+        return otpHash;
+    }
+
+    public void setOtpHash(String otpHash) {
+        this.otpHash = otpHash;
+    }
+
+    public Instant getOtpExpiresAt() {
+        return otpExpiresAt;
+    }
+
+    public void setOtpExpiresAt(Instant otpExpiresAt) {
+        this.otpExpiresAt = otpExpiresAt;
+    }
+
+    public Instant getLastSentAt() {
+        return lastSentAt;
+    }
+
+    public void setLastSentAt(Instant lastSentAt) {
+        this.lastSentAt = lastSentAt;
+    }
+
+    public int getSendCount() {
+        return sendCount;
+    }
+
+    public void setSendCount(int sendCount) {
+        this.sendCount = sendCount;
+    }
+
+    public int getVerifyAttempts() {
+        return verifyAttempts;
+    }
+
+    public void setVerifyAttempts(int verifyAttempts) {
+        this.verifyAttempts = verifyAttempts;
+    }
+
+    public boolean isConsumed() {
+        return consumed;
+    }
+
+    public void setConsumed(boolean consumed) {
+        this.consumed = consumed;
+    }
+
+    public Instant getExpiresAt() {
+        return expiresAt;
+    }
+
+    public void setExpiresAt(Instant expiresAt) {
+        this.expiresAt = expiresAt;
     }
 }
