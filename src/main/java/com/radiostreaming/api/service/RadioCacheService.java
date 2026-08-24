@@ -6,6 +6,7 @@ import com.radiostreaming.api.model.EventDocument;
 import com.radiostreaming.api.model.StationDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -38,6 +39,7 @@ public class RadioCacheService {
 
     private volatile Snapshot snapshot;
 
+    @Autowired
     public RadioCacheService(
             RadioDataService dataService,
             @Value("${app.cache.ttl:24h}") Duration ttl) {
