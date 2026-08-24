@@ -337,6 +337,36 @@ th {
   white-space: nowrap;
 }
 
+.suggest-list {
+  margin-top: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.suggest-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.suggest-item:last-child { border-bottom: 0; }
+.suggest-item:hover { background: #fff6e8; }
+
+.pin-ok {
+  display: block;
+  margin-top: 6px;
+  color: #146c43;
+  font-weight: 600;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/admin/css/admin.css?v=20260824e">
+  <link rel="stylesheet" href="/admin/css/admin.css?v=20260824g">
 </head>
 <body>
   <div id="admin-boot" style="min-height:100vh;display:grid;place-items:center;background:#eef2f7;color:#5b6b7c;font-family:sans-serif">Loading admin console...</div>
@@ -96,7 +96,7 @@
     </div>
     <div class="panel">
       <p class="cache-meta">Source: {{stats.cacheSource || 'cache'}} <span ng-if="stats.cacheLoadedAt">· loaded {{stats.cacheLoadedAt}}</span></p>
-      <p class="muted">Create sub-admins with independent Read / Add / Edit / Delete rights. You can also limit them to selected categories and organizations (for example only Dodra events).</p>
+      <p class="muted">Create sub-admins with independent Read / Add / Edit / Delete rights. You can also limit them to selected categories and organizations (for example only SGPC events).</p>
     </div>
   </script>
 
@@ -138,7 +138,7 @@
           <tr ng-repeat="event in items track by event._id">
             <td>
               <strong>{{event.title}}</strong>
-              <div class="muted">{{event.city}} · {{event.address}}</div>
+              <div class="muted">{{event.city}}<span ng-if="event.state">, {{event.state}}</span><span ng-if="event.country"> · {{event.country}}</span> · {{event.address}}</div>
               <div class="muted" ng-if="event.organizedBy">By {{event.organizedBy}}</div>
             </td>
             <td>{{event.date | date:'medium'}}</td>
@@ -175,15 +175,39 @@
         <div class="form-error" ng-if="formError">{{formError}}</div>
         <div class="grid-2">
           <label class="field"><span>Title</span><input ng-model="form.title" placeholder="e.g. Sunday Evening Kirtan"></label>
-          <label class="field"><span>City</span><input ng-model="form.city" placeholder="e.g. Amritsar"></label>
+          <label class="field">
+            <span>Country</span>
+            <select ng-model="form.countryCode" ng-change="onCountryChange()" ng-options="c.code as c.name for c in geoCountries">
+              <option value="">Select Country</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>State</span>
+            <select ng-model="form.state" ng-change="onStateChange()" ng-disabled="!form.countryCode" ng-options="state.name as state.name for state in geoStates">
+              <option value="">Select State</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>City</span>
+            <select ng-model="form.city" ng-change="onCityChange()" ng-disabled="!form.state" ng-options="city.name as city.name for city in geoCities">
+              <option value="">Select City</option>
+            </select>
+          </label>
           <label class="field"><span>Start Date</span><input type="datetime-local" local-datetime ng-model="form.date"></label>
           <label class="field"><span>End Date</span><input type="datetime-local" local-datetime ng-model="form.end_date"></label>
-          <label class="field"><span>Venue</span><input ng-model="form.address" placeholder="e.g. Gurdwara Sahib Hall"></label>
+          <label class="field" style="grid-column:1 / -1">
+            <span>Venue / Address</span>
+            <input ng-model="form.address" ng-disabled="!form.city" ng-change="onAddressType()" placeholder="e.g. start typing Gurdwara Sahib Hall" autocomplete="off">
+            <div class="suggest-list" ng-if="addressSuggestions.length">
+              <button class="suggest-item" type="button" ng-repeat="place in addressSuggestions" ng-click="pickAddress(place)">
+                {{place.address || place.label || place.name}}
+              </button>
+            </div>
+            <small class="pin-ok" ng-if="form.latitude && form.longitude">Map pin saved from the selected address</small>
+            <small class="muted" ng-if="form.city && !(form.latitude && form.longitude)">Choose an address suggestion to save the map pin.</small>
+          </label>
           <label class="field"><span>Organized By</span><input ng-model="form.organizedBy" placeholder="e.g. Divine Bliss Sangat"></label>
-          <label class="field"><span>Organization</span><input ng-model="form.organization" placeholder="e.g. dodra"></label>
-          <label class="field"><span>Category</span><input ng-model="form.category" placeholder="e.g. live_kirtan"></label>
-          <label class="field"><span>Latitude</span><input type="number" step="any" ng-model="form.latitude" placeholder="e.g. 31.6200"></label>
-          <label class="field"><span>Longitude</span><input type="number" step="any" ng-model="form.longitude" placeholder="e.g. 74.8765"></label>
+          <label class="field"><span>Organization</span><input ng-model="form.organization" placeholder="e.g. sgpc"></label>
           <label class="field">
             <span>Approval</span>
             <select ng-model="form.approvalStatus">
@@ -260,6 +284,7 @@
         <div class="grid-2">
           <label class="field"><span>English Name</span><input ng-model="form.nameEn" placeholder="e.g. Live Kirtan Radio"></label>
           <label class="field"><span>Hindi Name</span><input ng-model="form.nameHi" placeholder="e.g. लाइव कीर्तन रेडियो"></label>
+          <label class="field"><span>Punjabi Name</span><input ng-model="form.namePa" placeholder="e.g. ਲਾਈਵ ਕੀਰਤਨ ਰੇਡੀਓ"></label>
           <label class="field">
             <span>Category</span>
             <select ng-model="form.category" ng-options="cat.category as (cat | categoryName) for cat in lookupCategories">
@@ -489,7 +514,7 @@
           <label class="field"><span>Username</span><input ng-model="form.username" ng-disabled="!!form.id" placeholder="e.g. harpreet.admin"></label>
           <label class="field"><span>Password</span><input type="password" ng-model="form.password" placeholder="{{form.id ? 'Leave blank to keep current password' : 'e.g. Sangat@2026'}}"></label>
           <label class="field"><span>Display Name</span><input ng-model="form.displayName" placeholder="e.g. Harpreet Singh"></label>
-          <label class="field"><span>Home Organization</span><input ng-model="form.organization" placeholder="e.g. dodra"></label>
+          <label class="field"><span>Home Organization</span><input ng-model="form.organization" placeholder="e.g. sgpc"></label>
         </div>
         <label class="field">
           <span>Role</span>
@@ -522,7 +547,7 @@
           </div>
           <label class="field">
             <span>Allowed Organizations (Comma Separated)</span>
-            <input ng-model="form.allowedOrganizationsText" placeholder="e.g. dodra, amritsar">
+            <input ng-model="form.allowedOrganizationsText" placeholder="e.g. sgpc, amritsar">
           </label>
           <div class="field">
             <span>Allowed Categories (Stations And Links Follow These)</span>
@@ -550,7 +575,7 @@
     <div class="page-head">
       <div>
         <h1>Settings</h1>
-        <div class="muted">Gmail and Backblaze credentials are stored in MongoDB. Passwords are encrypted at rest.</div>
+        <div class="muted">Gmail, Backblaze, and geo API credentials are stored in MongoDB. Secrets are encrypted at rest. The geo key is used to download country, state, and city lists; address pins still come from the selected suggestion.</div>
       </div>
     </div>
     <div class="table-loader" ng-if="pageLoading">
@@ -565,7 +590,7 @@
           <label class="field" ng-repeat="(key, value) in item.fields">
             <span>{{fieldLabel(key)}}</span>
             <input ng-if="!isSecret(key)" ng-model="item.fields[key]" placeholder="{{fieldPlaceholder(item.type, key)}}">
-            <input ng-if="isSecret(key)" type="password" ng-model="item.fields[key]" placeholder="Leave blank to keep the saved password">
+            <input ng-if="isSecret(key)" type="password" ng-model="item.fields[key]" placeholder="{{fieldPlaceholder(item.type, key) || 'Leave blank to keep the saved value'}}">
           </label>
         </div>
         <div class="modal-actions" style="justify-content:flex-start">
@@ -607,7 +632,7 @@
           "https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.8.3/angular-route.min.js"
         ]);
       }).then(function () {
-        return loadScript("/admin/js/app.js?v=20260824e");
+        return loadScript("/admin/js/app.js?v=20260824g");
       }).then(function () {
         var boot = document.getElementById("admin-boot");
         if (boot) { boot.remove(); }

@@ -85,6 +85,9 @@ public class AdminCatalogService {
         event.setDate(request.getDate());
         event.setEndDate(request.getEndDate() != null ? request.getEndDate() : request.getDate());
         event.setCity(trimToEmpty(request.getCity()));
+        event.setCountry(trimToEmpty(request.getCountry()));
+        event.setCountryCode(trimToEmpty(request.getCountryCode()));
+        event.setState(trimToEmpty(request.getState()));
         event.setDescription(trimToEmpty(request.getDescription()));
         event.setAddress(trimToEmpty(request.getAddress()));
         event.setLatitude(request.getLatitude());
@@ -137,7 +140,7 @@ public class AdminCatalogService {
         event.setId(null);
         stampNewEvent(user, event);
         accessService.assertEventInScope(user, event);
-        if (event.getCategory() != null) {
+        if (event.getCategory() != null && !event.getCategory().isBlank()) {
             accessService.assertStationCategoryAllowed(user, event.getCategory());
         }
         return persistEvent(event);

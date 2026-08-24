@@ -26,8 +26,9 @@ public class CredentialBootstrap {
         try {
             credentialService.seedIfMissing(CredentialService.TYPE_GMAIL, gmailFields());
             credentialService.seedIfMissing(CredentialService.TYPE_B2, b2Fields());
+            credentialService.seedIfMissing(CredentialService.TYPE_GEO, geoFields());
         } catch (Exception ex) {
-            log.warn("Could not seed app credentials; SMTP and B2 settings can be added from admin Settings", ex);
+            log.warn("Could not seed app credentials; SMTP, B2, and GEO settings can be added from admin Settings", ex);
         }
     }
 
@@ -51,6 +52,13 @@ public class CredentialBootstrap {
         fields.put("endpointUrl", "https://s3.us-east-005.backblazeb2.com");
         fields.put("applicationKeyId", "41a1bdb99cac");
         fields.put("applicationKey", "0055d31ae347164d6f058cd6409e78e80ead403f4f");
+        return fields;
+    }
+
+    private static Map<String, String> geoFields() {
+        Map<String, String> fields = new LinkedHashMap<>();
+        fields.put("provider", "countrystatecity");
+        fields.put("apiKey", "");
         return fields;
     }
 }

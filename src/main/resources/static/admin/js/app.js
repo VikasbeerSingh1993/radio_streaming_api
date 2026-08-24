@@ -182,7 +182,17 @@
       },
       deleteUser: function (id) { return $http.delete(base + "/users/" + id); },
       credentials: function () { return $http.get(base + "/credentials"); },
-      saveCredential: function (type, fields) { return $http.put(base + "/credentials/" + type, fields); }
+      saveCredential: function (type, fields) { return $http.put(base + "/credentials/" + type, fields); },
+      geoCountries: function () { return $http.get("/api/geo/countries"); },
+      geoStates: function (countryCode) {
+        return $http.get("/api/geo/states", { params: { countryCode: countryCode } });
+      },
+      geoCities: function (countryCode, state, q) {
+        return $http.get("/api/geo/cities", { params: { countryCode: countryCode, state: state || "", q: q || "" } });
+      },
+      geoSuggest: function (countryCode, city, q) {
+        return $http.get("/api/geo/suggest", { params: { countryCode: countryCode, city: city || "", q: q } });
+      }
     };
   }]);
 
@@ -484,6 +494,14 @@
   app.controller("EventsCtrl", ["$scope", "$rootScope", "$timeout", "Api", "CatalogStore",
     function ($scope, $rootScope, $timeout, Api, CatalogStore) {
       $scope.filter = "approved";
+      $scope.geoCountries = [];
+      $scope.geoStates = [];
+      $scope.geoCities = [];
+      $scope.addressSuggestions = [];
+      var addressTimer = null;
+      Api.geoCountries().then(function (res) {
+        $scope.geoCountries = res.data || [];
+      }).catch(function () {});
       bindPaged($scope, $rootScope, CatalogStore, {
         key: "events",
         loadingMessage: "Loading events...",
@@ -497,22 +515,124 @@
       };
       $scope.openCreate = function () {
         $scope.formError = "";
+        $scope.addressSuggestions = [];
+        $scope.geoStates = [];
+        $scope.geoCities = [];
         var start = toDatetimeLocal(new Date());
         $scope.form = {
-          title: "", city: "", address: "", organizedBy: "", organization: "", category: "",
-          description: "", status: "scheduled", approvalStatus: "approved",
-          date: start, end_date: start
+          title: "", countryCode: "IN", country: "India", city: "", state: "", address: "",
+          organizedBy: "", organization: "", description: "", status: "scheduled",
+          approvalStatus: "approved", date: start, end_date: start
         };
+        $scope.loadStates("IN");
       };
       $scope.openEdit = function (event) {
         $scope.formError = "";
+        $scope.addressSuggestions = [];
+        $scope.geoStates = [];
+        $scope.geoCities = [];
         $scope.form = angular.copy(event);
         $scope.form.date = toDatetimeLocal(event.date);
         $scope.form.end_date = toDatetimeLocal(event.end_date || event.endDate || event.date);
+        if ($scope.form.countryCode) {
+          $scope.loadStates($scope.form.countryCode, $scope.form.state);
+        }
+      };
+      $scope.loadStates = function (countryCode, selectedState) {
+        if (!countryCode) {
+          $scope.geoStates = [];
+          $scope.geoCities = [];
+          return;
+        }
+        Api.geoStates(countryCode).then(function (res) {
+          $scope.geoStates = res.data || [];
+          if ($scope.form && $scope.form.state && !$scope.geoStates.some(function (state) {
+            return state.name === $scope.form.state;
+          })) {
+            $scope.geoStates.unshift({ name: $scope.form.state, code: "", countryCode: countryCode });
+          }
+          var stateName = selectedState || ($scope.form && $scope.form.state);
+          if (stateName) {
+            $scope.loadCities(countryCode, stateName);
+          }
+        }).catch(function () { $scope.geoStates = []; $scope.geoCities = []; });
+      };
+      $scope.loadCities = function (countryCode, state) {
+        if (!countryCode || !state) {
+          $scope.geoCities = [];
+          return;
+        }
+        Api.geoCities(countryCode, state).then(function (res) {
+          $scope.geoCities = res.data || [];
+          if ($scope.form && $scope.form.city && !$scope.geoCities.some(function (city) {
+            return city.name === $scope.form.city;
+          })) {
+            $scope.geoCities.unshift({
+              name: $scope.form.city,
+              state: state,
+              countryCode: countryCode
+            });
+          }
+        }).catch(function () { $scope.geoCities = []; });
+      };
+      $scope.onCountryChange = function () {
+        var match = ($scope.geoCountries || []).filter(function (c) {
+          return c.code === $scope.form.countryCode;
+        })[0];
+        $scope.form.country = match ? match.name : "";
+        $scope.form.city = "";
+        $scope.form.state = "";
+        $scope.form.address = "";
+        $scope.form.latitude = null;
+        $scope.form.longitude = null;
+        $scope.addressSuggestions = [];
+        $scope.geoCities = [];
+        $scope.loadStates($scope.form.countryCode);
+      };
+      $scope.onStateChange = function () {
+        $scope.form.city = "";
+        $scope.form.address = "";
+        $scope.form.latitude = null;
+        $scope.form.longitude = null;
+        $scope.addressSuggestions = [];
+        $scope.loadCities($scope.form.countryCode, $scope.form.state);
+      };
+      $scope.onCityChange = function () {
+        $scope.form.address = "";
+        $scope.form.latitude = null;
+        $scope.form.longitude = null;
+        $scope.addressSuggestions = [];
+      };
+      $scope.onAddressType = function () {
+        $scope.form.latitude = null;
+        $scope.form.longitude = null;
+        if (addressTimer) { $timeout.cancel(addressTimer); }
+        var query = ($scope.form.address || "").trim();
+        if (query.length < 3 || !$scope.form.countryCode) {
+          $scope.addressSuggestions = [];
+          return;
+        }
+        addressTimer = $timeout(function () {
+          Api.geoSuggest($scope.form.countryCode, $scope.form.city, query).then(function (res) {
+            $scope.addressSuggestions = res.data || [];
+          }).catch(function () { $scope.addressSuggestions = []; });
+        }, 400);
+      };
+      $scope.pickAddress = function (place) {
+        $scope.form.address = place.address || place.name || $scope.form.address;
+        $scope.form.latitude = place.latitude;
+        $scope.form.longitude = place.longitude;
+        if (place.state) { $scope.form.state = place.state; }
+        if (place.name && !$scope.form.city) { $scope.form.city = place.name; }
+        $scope.addressSuggestions = [];
       };
       $scope.save = function () {
-        if (!$scope.form.title || !$scope.form.city || !$scope.form.date) {
-          $scope.formError = "Please fill Title, City, and Start date.";
+        if (!$scope.form.title || !$scope.form.countryCode || !$scope.form.state || !$scope.form.city || !$scope.form.date) {
+          $scope.formError = "Please fill Title, Country, State, City, and Start date.";
+          return;
+        }
+        if ($scope.form.latitude == null || $scope.form.longitude == null) {
+          $scope.formError = "Type the venue and pick an address suggestion so the map pin can be saved.";
           return;
         }
         var payload = angular.copy($scope.form);
@@ -555,13 +675,14 @@
       loadLookups($scope, Api, CatalogStore);
       $scope.openCreate = function () {
         $scope.formError = "";
-        $scope.form = { live: true, play_mode: "sequence", type: "radio", language: "en", nameEn: "", nameHi: "", category: "" };
+        $scope.form = { live: true, play_mode: "sequence", type: "radio", language: "en", nameEn: "", nameHi: "", namePa: "", category: "" };
       };
       $scope.openEdit = function (station) {
         $scope.formError = "";
         $scope.form = angular.copy(station);
         $scope.form.nameEn = (station.translations && station.translations.en && station.translations.en.name) || "";
         $scope.form.nameHi = (station.translations && station.translations.hi && station.translations.hi.name) || "";
+        $scope.form.namePa = (station.translations && station.translations.pa && station.translations.pa.name) || "";
         $scope.form.play_mode = station.play_mode || station.playMode || "sequence";
         $scope.form.language = station.language || "en";
         $scope.form.type = station.type || "radio";
@@ -572,9 +693,14 @@
           return;
         }
         var payload = angular.copy($scope.form);
-        payload.translations = { en: { name: payload.nameEn || "" }, hi: { name: payload.nameHi || payload.nameEn || "" } };
+        payload.translations = {
+          en: { name: payload.nameEn || "" },
+          hi: { name: payload.nameHi || payload.nameEn || "" },
+          pa: { name: payload.namePa || payload.nameEn || "" }
+        };
         delete payload.nameEn;
         delete payload.nameHi;
+        delete payload.namePa;
         runAction($scope, $rootScope, CatalogStore, "Saving station...", function () {
           return Api.saveStation(payload);
         }, "Station saved.");
@@ -776,7 +902,9 @@
         region: "Region",
         endpointUrl: "Endpoint URL",
         applicationKeyId: "Application Key ID",
-        applicationKey: "Application Key"
+        applicationKey: "Application Key",
+        provider: "Geo Provider",
+        apiKey: "Geo API Key"
       };
       var placeholders = {
         GMAIL: {
@@ -795,6 +923,10 @@
           endpointUrl: "e.g. https://s3.us-east-005.backblazeb2.com",
           applicationKeyId: "e.g. 41a1bdb99cac",
           applicationKey: "Leave blank to keep the saved key"
+        },
+        GEO: {
+          provider: "e.g. countrystatecity",
+          apiKey: "Leave blank to keep the saved key"
         }
       };
       $scope.items = [];
@@ -806,7 +938,7 @@
         return (placeholders[type] && placeholders[type][key]) || "";
       };
       $scope.isSecret = function (key) {
-        return /password|applicationKey|secret/i.test(key || "");
+        return /password|applicationKey|secret|apiKey/i.test(key || "");
       };
       $scope.load = function () {
         $scope.pageLoading = !$scope.items.length;

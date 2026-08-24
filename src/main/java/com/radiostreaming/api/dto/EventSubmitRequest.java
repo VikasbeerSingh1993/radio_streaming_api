@@ -21,6 +21,9 @@ public class EventSubmitRequest {
     @NotBlank
     private String city;
 
+    private String country;
+    private String countryCode;
+    private String state;
     private String description;
     private String address;
     private Double latitude;
@@ -75,6 +78,30 @@ public class EventSubmitRequest {
 
     public void setCity(String city) {
         this.city = city;
+    }
+
+    public String getCountry() {
+        return country;
+    }
+
+    public void setCountry(String country) {
+        this.country = country;
+    }
+
+    public String getCountryCode() {
+        return countryCode;
+    }
+
+    public void setCountryCode(String countryCode) {
+        this.countryCode = countryCode;
+    }
+
+    public String getState() {
+        return state;
+    }
+
+    public void setState(String state) {
+        this.state = state;
     }
 
     public String getDescription() {

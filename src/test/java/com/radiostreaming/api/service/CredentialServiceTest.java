@@ -49,4 +49,19 @@ class CredentialServiceTest {
         assertEquals("plain-password", new CredentialCrypto("test-key").decrypt(stored));
         assertEquals("smtp.gmail.com", captor.getValue().getFields().get("host"));
     }
+
+    @Test
+    void seedEncryptsGeoApiKey() {
+        service.seedIfMissing("GEO", Map.of(
+                "provider", "countrystatecity",
+                "apiKey", "csc-test-key"
+        ));
+
+        ArgumentCaptor<CredentialDocument> captor = ArgumentCaptor.forClass(CredentialDocument.class);
+        verify(repository).save(captor.capture());
+        String stored = captor.getValue().getFields().get("apiKey");
+        assertTrue(stored.startsWith(CredentialCrypto.PREFIX));
+        assertEquals("csc-test-key", new CredentialCrypto("test-key").decrypt(stored));
+        assertEquals("countrystatecity", captor.getValue().getFields().get("provider"));
+    }
 }

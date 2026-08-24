@@ -12,6 +12,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -26,10 +27,12 @@ public class CredentialService {
 
     public static final String TYPE_GMAIL = "GMAIL";
     public static final String TYPE_B2 = "B2";
+    public static final String TYPE_GEO = "GEO";
     static final String MASK = "********";
     private static final Logger log = LoggerFactory.getLogger(CredentialService.class);
     private static final Set<String> SECRET_KEYS = Set.of(
-            "password", "applicationkey", "application_key", "secret", "secretkey", "appkey");
+            "password", "applicationkey", "application_key", "secret", "secretkey", "appkey",
+            "apikey", "api_key");
 
     private final CredentialRepository repository;
     private final CredentialCrypto crypto;
@@ -46,6 +49,12 @@ public class CredentialService {
             cache.put(normalize(document.getType()), document);
             views.add(maskedView(document));
         }
+        views.sort(Comparator.comparingInt(view -> switch (String.valueOf(view.get("type"))) {
+            case TYPE_GMAIL -> 0;
+            case TYPE_B2 -> 1;
+            case TYPE_GEO -> 2;
+            default -> 9;
+        }));
         return views;
     }
 
@@ -65,6 +74,9 @@ public class CredentialService {
                     return;
                 }
                 if (isSecretKey(key) && isBlankOrMasked(value)) {
+                    if (existing == null) {
+                        merged.putIfAbsent(key, "");
+                    }
                     return;
                 }
                 if (value == null) {
@@ -100,6 +112,19 @@ public class CredentialService {
         CredentialDocument document = require(type);
         String value = document.getFields() == null ? null : document.getFields().get(field);
         return crypto.decrypt(value);
+    }
+
+    public String geoApiKey() {
+        CredentialDocument document = find(TYPE_GEO).orElse(null);
+        if (document == null || document.getFields() == null) {
+            return "";
+        }
+        String value = document.getFields().get("apiKey");
+        if (value == null || value.isBlank()) {
+            value = document.getFields().get("api_key");
+        }
+        String decrypted = crypto.decrypt(value);
+        return decrypted == null ? "" : decrypted.trim();
     }
 
     public Optional<JavaMailSender> mailSender() {
@@ -161,6 +186,10 @@ public class CredentialService {
         if (document.getFields() != null) {
             document.getFields().forEach((key, value) ->
                     fields.put(key, isSecretKey(key) && value != null && !value.isBlank() ? MASK : value));
+        }
+        if (TYPE_GEO.equals(document.getType())) {
+            fields.putIfAbsent("provider", "countrystatecity");
+            fields.putIfAbsent("apiKey", "");
         }
         view.put("fields", fields);
         return view;

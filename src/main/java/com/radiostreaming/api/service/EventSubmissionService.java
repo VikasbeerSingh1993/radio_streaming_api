@@ -59,6 +59,9 @@ public class EventSubmissionService {
         submission.setDate(request.getDate());
         submission.setEndDate(request.getEndDate() != null ? request.getEndDate() : request.getDate());
         submission.setCity(request.getCity().trim());
+        submission.setCountry(trimToEmpty(request.getCountry()));
+        submission.setCountryCode(trimToEmpty(request.getCountryCode()));
+        submission.setState(trimToEmpty(request.getState()));
         submission.setDescription(trimToEmpty(request.getDescription()));
         submission.setAddress(trimToEmpty(request.getAddress()));
         submission.setLatitude(request.getLatitude());
@@ -192,6 +195,9 @@ public class EventSubmissionService {
         request.setDate(submission.getDate());
         request.setEndDate(submission.getEndDate());
         request.setCity(submission.getCity());
+        request.setCountry(submission.getCountry());
+        request.setCountryCode(submission.getCountryCode());
+        request.setState(submission.getState());
         request.setDescription(submission.getDescription());
         request.setAddress(submission.getAddress());
         request.setLatitude(submission.getLatitude());
