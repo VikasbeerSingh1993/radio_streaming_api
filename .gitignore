@@ -4,3 +4,4 @@ target/
 application-local.properties
 application.properties
 server.log
+.DS_Store
