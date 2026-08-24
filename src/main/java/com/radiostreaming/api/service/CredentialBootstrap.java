@@ -35,6 +35,7 @@ public class CredentialBootstrap {
             credentialService.seedIfMissing(CredentialService.TYPE_GMAIL, gmailFields());
             credentialService.seedIfMissing(CredentialService.TYPE_B2, b2Fields());
             credentialService.seedIfMissing(CredentialService.TYPE_GEO, geoFields());
+            credentialService.ensurePhotonProvider();
             credentialService.seedIfMissing(CredentialService.TYPE_MONGO, mongoFields());
         } catch (Exception ex) {
             log.warn("Could not seed app credentials; they can be added from admin Settings", ex);
@@ -70,7 +71,7 @@ public class CredentialBootstrap {
 
     private static Map<String, String> geoFields() {
         Map<String, String> fields = new LinkedHashMap<>();
-        fields.put("provider", "countrystatecity");
+        fields.put("provider", "photon");
         fields.put("apiKey", "");
         return fields;
     }

@@ -10,9 +10,11 @@ import com.radiostreaming.api.repository.StateRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -27,26 +29,43 @@ public class GeoService {
     private static final Logger log = LoggerFactory.getLogger(GeoService.class);
     private static final List<Map<String, String>> FALLBACK_COUNTRIES = buildCountries();
     private static final List<GeoPlace> FALLBACK_CITIES = buildCities();
+    private static final String CONTACT_EMAIL = "vikasbeersingh@gmail.com";
+    private static final String USER_AGENT = "RadioStreamingApp/1.0 (" + CONTACT_EMAIL + ")";
 
     private final CountryRepository countryRepository;
     private final StateRepository stateRepository;
     private final CityRepository cityRepository;
     private final GeoCatalogClient geoCatalogClient;
-    private final RestClient nominatim = RestClient.builder()
-            .baseUrl("https://nominatim.openstreetmap.org")
-            .defaultHeader("User-Agent", "radio-streaming-api/1.0 (event-location)")
-            .defaultHeader("Accept", "application/json")
-            .build();
+    private final CredentialService credentialService;
+    private final RestClient nominatim = geoHttp("https://nominatim.openstreetmap.org");
+    private final RestClient photon = geoHttp("https://photon.komoot.io");
+    private final RestClient locationIq = geoHttp("https://api.locationiq.com");
+    private final RestClient geoapify = geoHttp("https://api.geoapify.com");
 
     public GeoService(
             CountryRepository countryRepository,
             StateRepository stateRepository,
             CityRepository cityRepository,
-            GeoCatalogClient geoCatalogClient) {
+            GeoCatalogClient geoCatalogClient,
+            CredentialService credentialService) {
         this.countryRepository = countryRepository;
         this.stateRepository = stateRepository;
         this.cityRepository = cityRepository;
         this.geoCatalogClient = geoCatalogClient;
+        this.credentialService = credentialService;
+    }
+
+    private static RestClient geoHttp(String baseUrl) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofSeconds(4));
+        factory.setReadTimeout(Duration.ofSeconds(6));
+        return RestClient.builder()
+                .baseUrl(baseUrl)
+                .requestFactory(factory)
+                .defaultHeader("User-Agent", USER_AGENT)
+                .defaultHeader("Accept", "application/json")
+                .defaultHeader("Accept-Language", "en")
+                .build();
     }
 
     public List<Map<String, String>> countries() {
@@ -342,7 +361,91 @@ public class GeoService {
         if (city != null && !city.isBlank() && !needle.toLowerCase(Locale.ROOT).contains(city.toLowerCase(Locale.ROOT))) {
             q = needle + ", " + city;
         }
+        String provider = credentialService.geoProvider();
+        String apiKey = credentialService.geoApiKey();
+        if (!apiKey.isBlank()) {
+            if ("locationiq".equals(provider)) {
+                List<GeoPlace> keyed = searchLocationIq(countryCode, q, apiKey);
+                if (!keyed.isEmpty()) {
+                    return keyed;
+                }
+            } else if ("geoapify".equals(provider)) {
+                List<GeoPlace> keyed = searchGeoapify(countryCode, q, apiKey);
+                if (!keyed.isEmpty()) {
+                    return keyed;
+                }
+            }
+        }
+        List<GeoPlace> photonPlaces = searchPhoton(countryCode, q);
+        if (!photonPlaces.isEmpty()) {
+            return photonPlaces;
+        }
+        log.info("Photon returned no address matches for {}; trying Nominatim", q);
         return searchNominatim(countryCode, q, false);
+    }
+
+    private List<GeoPlace> searchPhoton(String countryCode, String query) {
+        try {
+            Map<String, Object> body = photon.get()
+                    .uri(uri -> uri.path("/api/")
+                            .queryParam("q", query)
+                            .queryParam("limit", "8")
+                            .queryParam("lang", "en")
+                            .build())
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {
+                    });
+            return fromPhotonBody(body, countryCode);
+        } catch (Exception ex) {
+            log.warn("Photon lookup failed for {}", query, ex);
+            return List.of();
+        }
+    }
+
+    private List<GeoPlace> searchLocationIq(String countryCode, String query, String apiKey) {
+        try {
+            List<Map<String, Object>> rows = locationIq.get()
+                    .uri(uri -> uri.path("/v1/autocomplete")
+                            .queryParam("key", apiKey)
+                            .queryParam("q", query)
+                            .queryParam("limit", "8")
+                            .queryParam("format", "json")
+                            .queryParam("addressdetails", "1")
+                            .queryParam("countrycodes", countryCode == null ? "" : countryCode.toLowerCase(Locale.ROOT))
+                            .build())
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {
+                    });
+            return fromNominatimRows(rows, countryCode, false);
+        } catch (Exception ex) {
+            log.warn("LocationIQ lookup failed for {}", query, ex);
+            return List.of();
+        }
+    }
+
+    private List<GeoPlace> searchGeoapify(String countryCode, String query, String apiKey) {
+        try {
+            String code = countryCode == null ? "" : countryCode.toLowerCase(Locale.ROOT);
+            Map<String, Object> body = geoapify.get()
+                    .uri(uri -> {
+                        var builder = uri.path("/v1/geocode/autocomplete")
+                                .queryParam("text", query)
+                                .queryParam("limit", "8")
+                                .queryParam("format", "geojson")
+                                .queryParam("apiKey", apiKey);
+                        if (!code.isBlank()) {
+                            builder.queryParam("filter", "countrycode:" + code);
+                        }
+                        return builder.build();
+                    })
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {
+                    });
+            return fromPhotonBody(body, countryCode);
+        } catch (Exception ex) {
+            log.warn("Geoapify lookup failed for {}", query, ex);
+            return List.of();
+        }
     }
 
     private List<GeoPlace> searchNominatim(String countryCode, String query, boolean citiesOnly) {
@@ -352,31 +455,123 @@ public class GeoService {
                             .queryParam("format", "json")
                             .queryParam("addressdetails", "1")
                             .queryParam("limit", citiesOnly ? "12" : "8")
+                            .queryParam("email", CONTACT_EMAIL)
                             .queryParam("countrycodes", countryCode == null ? "" : countryCode.toLowerCase(Locale.ROOT))
                             .queryParam("q", query)
                             .build())
                     .retrieve()
                     .body(new ParameterizedTypeReference<>() {
                     });
-            if (rows == null) {
-                return List.of();
-            }
-            List<GeoPlace> places = new ArrayList<>();
-            for (Map<String, Object> row : rows) {
-                GeoPlace place = fromNominatim(row, countryCode);
-                if (place.getName() == null || place.getName().isBlank()) {
-                    continue;
-                }
-                if (citiesOnly && place.getLatitude() == null) {
-                    continue;
-                }
-                places.add(place);
-            }
-            return places;
+            return fromNominatimRows(rows, countryCode, citiesOnly);
         } catch (Exception ex) {
-            log.warn("Location lookup failed for {}", query, ex);
+            log.warn("Nominatim lookup failed for {}", query, ex);
             return List.of();
         }
+    }
+
+    private static List<GeoPlace> fromNominatimRows(
+            List<Map<String, Object>> rows,
+            String countryCode,
+            boolean citiesOnly) {
+        if (rows == null) {
+            return List.of();
+        }
+        List<GeoPlace> places = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            GeoPlace place = fromNominatim(row, countryCode);
+            if (place.getName() == null || place.getName().isBlank()) {
+                continue;
+            }
+            if (citiesOnly && place.getLatitude() == null) {
+                continue;
+            }
+            places.add(place);
+        }
+        return places;
+    }
+
+    @SuppressWarnings("unchecked")
+    static List<GeoPlace> fromPhotonBody(Map<String, Object> body, String countryCode) {
+        if (body == null) {
+            return List.of();
+        }
+        Object featuresObj = body.get("features");
+        if (!(featuresObj instanceof List<?> features)) {
+            return List.of();
+        }
+        String wanted = normalizeCode(countryCode);
+        List<GeoPlace> places = new ArrayList<>();
+        for (Object featureObj : features) {
+            if (!(featureObj instanceof Map<?, ?> feature)) {
+                continue;
+            }
+            GeoPlace place = fromPhotonFeature((Map<String, Object>) feature, wanted);
+            if (place != null) {
+                places.add(place);
+            }
+        }
+        return places;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static GeoPlace fromPhotonFeature(Map<String, Object> feature, String countryCode) {
+        Map<String, Object> properties = feature.get("properties") instanceof Map<?, ?> map
+                ? (Map<String, Object>) map
+                : Map.of();
+        Map<String, Object> geometry = feature.get("geometry") instanceof Map<?, ?> map
+                ? (Map<String, Object>) map
+                : Map.of();
+        String code = stringOf(properties.get("countrycode"));
+        if (code.isBlank()) {
+            code = stringOf(properties.get("country_code"));
+        }
+        code = code.toUpperCase(Locale.ROOT);
+        if (!countryCode.isBlank() && !code.isBlank() && !countryCode.equals(code)) {
+            return null;
+        }
+        GeoPlace place = new GeoPlace();
+        place.setName(first(properties, "name", "street", "city", "formatted"));
+        place.setState(first(properties, "state", "region"));
+        place.setCountry(stringOf(properties.get("country")));
+        place.setCountryCode(code.isBlank() ? countryCode : code);
+        String formatted = stringOf(properties.get("formatted"));
+        place.setAddress(formatted.isBlank() ? photonAddress(properties) : formatted);
+        if (properties.get("lat") != null && properties.get("lon") != null) {
+            place.setLatitude(toDouble(properties.get("lat")));
+            place.setLongitude(toDouble(properties.get("lon")));
+        } else if (geometry.get("coordinates") instanceof List<?> coords && coords.size() >= 2) {
+            place.setLongitude(toDouble(coords.get(0)));
+            place.setLatitude(toDouble(coords.get(1)));
+        }
+        if (place.getName() == null || place.getName().isBlank()
+                || place.getLatitude() == null || place.getLongitude() == null) {
+            return null;
+        }
+        if (place.getAddress() == null || place.getAddress().isBlank()) {
+            place.setAddress(place.getName());
+        }
+        return place;
+    }
+
+    private static String photonAddress(Map<String, Object> properties) {
+        List<String> parts = new ArrayList<>();
+        String name = stringOf(properties.get("name"));
+        String house = stringOf(properties.get("housenumber"));
+        String street = stringOf(properties.get("street"));
+        String streetLine = (house + " " + street).trim();
+        if (!name.isBlank()) {
+            parts.add(name);
+        }
+        if (!streetLine.isBlank() && !streetLine.equalsIgnoreCase(name)) {
+            parts.add(streetLine);
+        }
+        for (String key : List.of("district", "city", "state", "postcode", "country")) {
+            String value = stringOf(properties.get(key));
+            if (!value.isBlank() && parts.stream().noneMatch(part -> part.equalsIgnoreCase(value))) {
+                parts.add(value);
+            }
+        }
+        return String.join(", ", parts);
     }
 
     @SuppressWarnings("unchecked")
@@ -385,12 +580,13 @@ public class GeoService {
                 ? (Map<String, Object>) map
                 : Map.of();
         GeoPlace place = new GeoPlace();
-        place.setName(first(address, "city", "town", "village", "suburb", "hamlet", "county"));
+        place.setName(first(address, "amenity", "building", "tourism", "shop", "leisure",
+                "historic", "name", "road", "city", "town", "village", "suburb", "hamlet", "county"));
         place.setState(first(address, "state", "region", "state_district"));
         place.setCountry(stringOf(address.get("country")));
         String code = stringOf(address.get("country_code"));
         place.setCountryCode(code.isBlank() ? normalizeCode(countryCode) : code.toUpperCase(Locale.ROOT));
-        place.setAddress(stringOf(row.get("display_name")));
+        place.setAddress(firstNonBlank(stringOf(row.get("display_name")), stringOf(row.get("display_place"))));
         place.setLatitude(toDouble(row.get("lat")));
         place.setLongitude(toDouble(row.get("lon")));
         if (place.getName() == null || place.getName().isBlank()) {
@@ -398,6 +594,15 @@ public class GeoService {
             place.setName(display.contains(",") ? display.substring(0, display.indexOf(',')) : display);
         }
         return place;
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return "";
     }
 
     private static String first(Map<String, Object> address, String... keys) {

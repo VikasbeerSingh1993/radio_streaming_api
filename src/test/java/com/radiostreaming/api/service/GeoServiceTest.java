@@ -34,12 +34,15 @@ class GeoServiceTest {
     private CityRepository cityRepository;
     @Mock
     private GeoCatalogClient geoCatalogClient;
+    @Mock
+    private CredentialService credentialService;
 
     private GeoService geoService;
 
     @BeforeEach
     void setUp() {
-        geoService = new GeoService(countryRepository, stateRepository, cityRepository, geoCatalogClient);
+        geoService = new GeoService(
+                countryRepository, stateRepository, cityRepository, geoCatalogClient, credentialService);
     }
 
     @Test
@@ -161,6 +164,54 @@ class GeoServiceTest {
         assertEquals(1, cities.size());
         assertEquals("Amritsar", cities.getFirst().getName());
         assertEquals("Punjab", cities.getFirst().getState());
+    }
+
+    @Test
+    void photonFeatureMapsNameCoordinatesAndAddress() {
+        Map<String, Object> body = Map.of(
+                "features", List.of(Map.of(
+                        "type", "Feature",
+                        "properties", Map.of(
+                                "name", "Shri Harmandir Sahib",
+                                "street", "Golden Temple Road",
+                                "city", "Amritsar",
+                                "state", "Punjab",
+                                "country", "India",
+                                "countrycode", "IN",
+                                "postcode", "143001"
+                        ),
+                        "geometry", Map.of(
+                                "type", "Point",
+                                "coordinates", List.of(74.8765281, 31.6199787)
+                        )
+                ))
+        );
+
+        var places = GeoService.fromPhotonBody(body, "IN");
+
+        assertEquals(1, places.size());
+        assertEquals("Shri Harmandir Sahib", places.getFirst().getName());
+        assertEquals("Punjab", places.getFirst().getState());
+        assertEquals("IN", places.getFirst().getCountryCode());
+        assertEquals(31.6199787, places.getFirst().getLatitude(), 0.0000001);
+        assertEquals(74.8765281, places.getFirst().getLongitude(), 0.0000001);
+        assertTrue(places.getFirst().getAddress().contains("Golden Temple Road"));
+    }
+
+    @Test
+    void photonDropsResultsFromOtherCountries() {
+        Map<String, Object> body = Map.of(
+                "features", List.of(Map.of(
+                        "properties", Map.of(
+                                "name", "Golden Gate",
+                                "city", "San Francisco",
+                                "countrycode", "US"
+                        ),
+                        "geometry", Map.of("coordinates", List.of(-122.4783, 37.8199))
+                ))
+        );
+
+        assertTrue(GeoService.fromPhotonBody(body, "IN").isEmpty());
     }
 
     private static CountryDocument country(String code, String name) {

@@ -42,7 +42,7 @@ public class RemoteGeoCatalogClient implements GeoCatalogClient {
     @Override
     public List<Map<String, String>> fetchCountries() {
         String apiKey = credentialService.geoApiKey();
-        if (!apiKey.isBlank()) {
+        if (usesCountryStateCity(apiKey)) {
             List<Map<String, String>> fromKey = fetchCscCountries(apiKey);
             if (!fromKey.isEmpty()) {
                 return fromKey;
@@ -54,7 +54,7 @@ public class RemoteGeoCatalogClient implements GeoCatalogClient {
     @Override
     public List<Map<String, String>> fetchStates(String countryCode, String countryName) {
         String apiKey = credentialService.geoApiKey();
-        if (!apiKey.isBlank()) {
+        if (usesCountryStateCity(apiKey)) {
             List<Map<String, String>> fromKey = fetchCscStates(countryCode, apiKey);
             if (!fromKey.isEmpty()) {
                 return fromKey;
@@ -70,13 +70,18 @@ public class RemoteGeoCatalogClient implements GeoCatalogClient {
             String stateName,
             String stateCode) {
         String apiKey = credentialService.geoApiKey();
-        if (!apiKey.isBlank() && stateCode != null && !stateCode.isBlank()) {
+        if (usesCountryStateCity(apiKey) && stateCode != null && !stateCode.isBlank()) {
             List<Map<String, String>> fromKey = fetchCscCities(countryCode, stateCode, stateName, apiKey);
             if (!fromKey.isEmpty()) {
                 return fromKey;
             }
         }
         return fetchCountriesNowCities(countryName, stateName);
+    }
+
+    private boolean usesCountryStateCity(String apiKey) {
+        return apiKey != null && !apiKey.isBlank()
+                && "countrystatecity".equalsIgnoreCase(credentialService.geoProvider());
     }
 
     private List<Map<String, String>> fetchCscCountries(String apiKey) {

@@ -66,6 +66,33 @@ class CredentialServiceTest {
     }
 
     @Test
+    void ensurePhotonProviderWhenCountryStateCityHasNoKey() {
+        service.seedIfMissing("GEO", Map.of(
+                "provider", "countrystatecity",
+                "apiKey", ""
+        ));
+
+        service.ensurePhotonProvider();
+
+        ArgumentCaptor<CredentialDocument> captor = ArgumentCaptor.forClass(CredentialDocument.class);
+        verify(repository, org.mockito.Mockito.times(2)).save(captor.capture());
+        assertEquals("photon", captor.getValue().getFields().get("provider"));
+    }
+
+    @Test
+    void ensurePhotonProviderKeepsKeyedCountryStateCity() {
+        service.seedIfMissing("GEO", Map.of(
+                "provider", "countrystatecity",
+                "apiKey", "csc-test-key"
+        ));
+
+        service.ensurePhotonProvider();
+
+        verify(repository, org.mockito.Mockito.times(1)).save(any(CredentialDocument.class));
+        assertEquals("countrystatecity", service.geoProvider());
+    }
+
+    @Test
     void seedEncryptsMongoPassword() {
         service.seedIfMissing("MONGO", Map.of(
                 "username", "atlasUser",

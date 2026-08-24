@@ -129,6 +129,49 @@ public class CredentialService {
         return decrypted == null ? "" : decrypted.trim();
     }
 
+    public String geoProvider() {
+        CredentialDocument document = find(TYPE_GEO).orElse(null);
+        if (document == null || document.getFields() == null) {
+            return "photon";
+        }
+        String value = document.getFields().get("provider");
+        if (value == null || value.isBlank()) {
+            return "photon";
+        }
+        return value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    public void ensurePhotonProvider() {
+        CredentialDocument document = find(TYPE_GEO).orElse(null);
+        if (document == null) {
+            return;
+        }
+        Map<String, String> fields = document.getFields() == null
+                ? new LinkedHashMap<>()
+                : new LinkedHashMap<>(document.getFields());
+        String provider = fields.getOrDefault("provider", "").trim();
+        boolean hasKey = !geoApiKey().isBlank();
+        if (hasKey && isKeyedGeoProvider(provider)) {
+            return;
+        }
+        if ("photon".equalsIgnoreCase(provider)) {
+            return;
+        }
+        fields.put("provider", "photon");
+        fields.putIfAbsent("apiKey", "");
+        document.setFields(fields);
+        document.setUpdatedAt(Instant.now());
+        CredentialDocument saved = repository.save(document);
+        cache.put(saved.getType(), saved);
+        log.info("GEO address suggestions use Photon (no API key required)");
+    }
+
+    private static boolean isKeyedGeoProvider(String provider) {
+        return "locationiq".equalsIgnoreCase(provider)
+                || "geoapify".equalsIgnoreCase(provider)
+                || "countrystatecity".equalsIgnoreCase(provider);
+    }
+
     public Optional<JavaMailSender> mailSender() {
         return find(TYPE_GMAIL).map(this::toMailSender);
     }
@@ -190,7 +233,7 @@ public class CredentialService {
                     fields.put(key, isSecretKey(key) && value != null && !value.isBlank() ? MASK : value));
         }
         if (TYPE_GEO.equals(document.getType())) {
-            fields.putIfAbsent("provider", "countrystatecity");
+            fields.putIfAbsent("provider", "photon");
             fields.putIfAbsent("apiKey", "");
         }
         if (TYPE_MONGO.equals(document.getType())) {

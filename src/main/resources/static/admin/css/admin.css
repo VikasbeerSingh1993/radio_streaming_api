@@ -342,8 +342,10 @@ th {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fff;
-  max-height: 180px;
+  max-height: 220px;
   overflow: auto;
+  position: relative;
+  z-index: 2;
 }
 
 .suggest-item {

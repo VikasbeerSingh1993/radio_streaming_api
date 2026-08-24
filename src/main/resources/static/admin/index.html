@@ -198,6 +198,7 @@
           <label class="field" style="grid-column:1 / -1">
             <span>Venue / Address</span>
             <input ng-model="form.address" ng-disabled="!form.city" ng-change="onAddressType()" placeholder="e.g. start typing Gurdwara Sahib Hall" autocomplete="off">
+            <small class="muted" ng-if="addressSearching">Searching addresses…</small>
             <div class="suggest-list" ng-if="addressSuggestions.length">
               <button class="suggest-item" type="button" ng-repeat="place in addressSuggestions" ng-click="pickAddress(place)">
                 {{place.address || place.label || place.name}}

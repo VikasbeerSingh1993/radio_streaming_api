@@ -498,7 +498,9 @@
       $scope.geoStates = [];
       $scope.geoCities = [];
       $scope.addressSuggestions = [];
+      $scope.addressSearching = false;
       var addressTimer = null;
+      var suggestSeq = 0;
       Api.geoCountries().then(function (res) {
         $scope.geoCountries = res.data || [];
       }).catch(function () {});
@@ -609,13 +611,23 @@
         if (addressTimer) { $timeout.cancel(addressTimer); }
         var query = ($scope.form.address || "").trim();
         if (query.length < 3 || !$scope.form.countryCode) {
+          suggestSeq += 1;
           $scope.addressSuggestions = [];
+          $scope.addressSearching = false;
           return;
         }
         addressTimer = $timeout(function () {
+          var seq = ++suggestSeq;
+          $scope.addressSearching = true;
           Api.geoSuggest($scope.form.countryCode, $scope.form.city, query).then(function (res) {
+            if (seq !== suggestSeq) { return; }
             $scope.addressSuggestions = res.data || [];
-          }).catch(function () { $scope.addressSuggestions = []; });
+            $scope.addressSearching = false;
+          }).catch(function () {
+            if (seq !== suggestSeq) { return; }
+            $scope.addressSuggestions = [];
+            $scope.addressSearching = false;
+          });
         }, 400);
       };
       $scope.pickAddress = function (place) {
@@ -930,8 +942,8 @@
           applicationKey: "Leave blank to keep the saved key"
         },
         GEO: {
-          provider: "e.g. countrystatecity",
-          apiKey: "Leave blank to keep the saved key"
+          provider: "photon (default, no key). Optional: locationiq, geoapify, countrystatecity",
+          apiKey: "Optional. Photon needs no key. Paste LocationIQ/Geoapify/CSC key here"
         },
         MONGO: {
           username: "e.g. atlasUser",
