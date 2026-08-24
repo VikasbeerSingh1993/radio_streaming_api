@@ -64,4 +64,22 @@ class CredentialServiceTest {
         assertEquals("csc-test-key", new CredentialCrypto("test-key").decrypt(stored));
         assertEquals("countrystatecity", captor.getValue().getFields().get("provider"));
     }
+
+    @Test
+    void seedEncryptsMongoPassword() {
+        service.seedIfMissing("MONGO", Map.of(
+                "username", "atlasUser",
+                "password", "atlas-password",
+                "cluster", "cluster0.abc123.mongodb.net",
+                "database", "divine_bliss_streaming"
+        ));
+
+        ArgumentCaptor<CredentialDocument> captor = ArgumentCaptor.forClass(CredentialDocument.class);
+        verify(repository).save(captor.capture());
+        String stored = captor.getValue().getFields().get("password");
+        assertTrue(stored.startsWith(CredentialCrypto.PREFIX));
+        assertEquals("atlas-password", new CredentialCrypto("test-key").decrypt(stored));
+        assertEquals("cluster0.abc123.mongodb.net", captor.getValue().getFields().get("cluster"));
+        assertEquals("divine_bliss_streaming", captor.getValue().getFields().get("database"));
+    }
 }

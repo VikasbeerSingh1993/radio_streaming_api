@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/admin/css/admin.css?v=20260824g">
+  <link rel="stylesheet" href="/admin/css/admin.css?v=20260824h">
 </head>
 <body>
   <div id="admin-boot" style="min-height:100vh;display:grid;place-items:center;background:#eef2f7;color:#5b6b7c;font-family:sans-serif">Loading admin console...</div>
@@ -575,7 +575,7 @@
     <div class="page-head">
       <div>
         <h1>Settings</h1>
-        <div class="muted">Gmail, Backblaze, and geo API credentials are stored in MongoDB. Secrets are encrypted at rest. The geo key is used to download country, state, and city lists; address pins still come from the selected suggestion.</div>
+        <div class="muted">Gmail, Backblaze, geo, and Mongo credentials are stored in the common <code>app_credentials</code> table. Secrets are encrypted. Railway <code>MONGODB_URI</code> is only used to open that table on boot.</div>
       </div>
     </div>
     <div class="table-loader" ng-if="pageLoading">
@@ -588,7 +588,7 @@
       <form novalidate ng-submit="save(item)">
         <div class="grid-2">
           <label class="field" ng-repeat="(key, value) in item.fields">
-            <span>{{fieldLabel(key)}}</span>
+            <span>{{fieldLabel(item.type, key)}}</span>
             <input ng-if="!isSecret(key)" ng-model="item.fields[key]" placeholder="{{fieldPlaceholder(item.type, key)}}">
             <input ng-if="isSecret(key)" type="password" ng-model="item.fields[key]" placeholder="{{fieldPlaceholder(item.type, key) || 'Leave blank to keep the saved value'}}">
           </label>
@@ -632,7 +632,7 @@
           "https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.8.3/angular-route.min.js"
         ]);
       }).then(function () {
-        return loadScript("/admin/js/app.js?v=20260824g");
+        return loadScript("/admin/js/app.js?v=20260824h");
       }).then(function () {
         var boot = document.getElementById("admin-boot");
         if (boot) { boot.remove(); }

@@ -28,6 +28,7 @@ public class CredentialService {
     public static final String TYPE_GMAIL = "GMAIL";
     public static final String TYPE_B2 = "B2";
     public static final String TYPE_GEO = "GEO";
+    public static final String TYPE_MONGO = "MONGO";
     static final String MASK = "********";
     private static final Logger log = LoggerFactory.getLogger(CredentialService.class);
     private static final Set<String> SECRET_KEYS = Set.of(
@@ -53,6 +54,7 @@ public class CredentialService {
             case TYPE_GMAIL -> 0;
             case TYPE_B2 -> 1;
             case TYPE_GEO -> 2;
+            case TYPE_MONGO -> 3;
             default -> 9;
         }));
         return views;
@@ -190,6 +192,12 @@ public class CredentialService {
         if (TYPE_GEO.equals(document.getType())) {
             fields.putIfAbsent("provider", "countrystatecity");
             fields.putIfAbsent("apiKey", "");
+        }
+        if (TYPE_MONGO.equals(document.getType())) {
+            fields.putIfAbsent("username", "");
+            fields.putIfAbsent("password", "");
+            fields.putIfAbsent("cluster", "");
+            fields.putIfAbsent("database", "");
         }
         view.put("fields", fields);
         return view;

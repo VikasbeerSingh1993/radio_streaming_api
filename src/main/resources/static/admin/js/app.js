@@ -892,9 +892,7 @@
       var labels = {
         host: "SMTP Host",
         port: "SMTP Port",
-        username: "Gmail Username",
         from: "From Address",
-        password: "App Password",
         auth: "SMTP Auth",
         starttls: "STARTTLS",
         bucket: "Bucket Name",
@@ -904,7 +902,14 @@
         applicationKeyId: "Application Key ID",
         applicationKey: "Application Key",
         provider: "Geo Provider",
-        apiKey: "Geo API Key"
+        apiKey: "Geo API Key",
+        cluster: "Cluster Host",
+        database: "Database Name",
+        srv: "SRV connection"
+      };
+      var typeLabels = {
+        GMAIL: { username: "Gmail Username", password: "App Password" },
+        MONGO: { username: "Mongo Username", password: "Mongo Password" }
       };
       var placeholders = {
         GMAIL: {
@@ -927,13 +932,22 @@
         GEO: {
           provider: "e.g. countrystatecity",
           apiKey: "Leave blank to keep the saved key"
+        },
+        MONGO: {
+          username: "e.g. atlasUser",
+          password: "Leave blank to keep the saved password",
+          cluster: "e.g. cluster0.abc123.mongodb.net",
+          database: "e.g. divine_bliss_streaming",
+          srv: "true"
         }
       };
       $scope.items = [];
       $scope.pageLoading = true;
       $scope.saving = false;
       $scope.formError = "";
-      $scope.fieldLabel = function (key) { return labels[key] || key; };
+      $scope.fieldLabel = function (type, key) {
+        return (typeLabels[type] && typeLabels[type][key]) || labels[key] || key;
+      };
       $scope.fieldPlaceholder = function (type, key) {
         return (placeholders[type] && placeholders[type][key]) || "";
       };
