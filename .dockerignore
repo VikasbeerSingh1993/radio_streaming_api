@@ -3,5 +3,4 @@ target
 .idea
 *.iml
 server.log
-application.properties
 application-local.properties

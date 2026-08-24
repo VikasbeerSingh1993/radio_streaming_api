@@ -25,59 +25,46 @@ Spring Boot REST API for the Flutter radio streaming app.
 | PUT | `/api/audio-links/{linkId}/played` | Update played flag (`{"played": true}`) |
 | POST | `/api/audio-links/station/{stationId}/reset` | Reset played flags for station |
 
-Normal GET requests are served from an in-memory second-level cache. MongoDB is queried:
-
-- once at startup
-- again after `app.cache.ttl` (default 24 hours)
-- immediately when `POST /api/cache/reload` is called
-
-A single shared `MongoClient` is used for all database access.
-
-## Configuration
-
-Set MongoDB URI via environment variable (required in production):
-
-```powershell
-$env:MONGODB_URI="mongodb+srv://USER:PASS@cluster0.example.mongodb.net/divine_bliss_streaming"
-```
-
-Or copy `src/main/resources/application.properties.example` to `application.properties` for local use.
-
 ## Run locally
 
 Requires Java 21 and Maven.
 
 ```powershell
+$env:MONGODB_URI="mongodb+srv://USER:PASS@cluster0.example.mongodb.net/divine_bliss_streaming"
 mvn spring-boot:run
 ```
 
 Server starts on **http://localhost:8080**
 
-## Test
+## Deploy on Railway (automatic from GitHub)
+
+This repo is set up for Railway:
+
+- `Dockerfile` — multi-stage Java 21 build
+- `railway.toml` — Dockerfile builder + `/api/health` check
+- `server.port=${PORT:8080}` — uses Railway's `PORT`
+
+### First-time setup
+
+1. Create a Railway project from this GitHub repo (`radio_streaming_api`).
+2. Add a variable:
+
+   | Variable | Value |
+   |----------|--------|
+   | `MONGODB_URI` | Your MongoDB Atlas connection string |
+
+3. In the service **Settings → Networking**, click **Generate Domain**.
+4. Enable GitHub auto-deploy on the `main` branch.
+
+Later pushes to `main` rebuild and redeploy automatically.
+
+### CLI alternative
 
 ```powershell
-mvn test
-
-curl http://localhost:8080/api/health
-curl http://localhost:8080/api/cache/status
-curl http://localhost:8080/api/stations
-curl -X POST http://localhost:8080/api/cache/reload
+npm i -g @railway/cli
+railway login
+railway init
+railway up
+railway domain
+railway variable set MONGODB_URI="mongodb+srv://USER:PASS@host/db"
 ```
-
-## GitHub deployment
-
-This repo is the deployable API. Set these environment variables on the host:
-
-| Variable | Purpose |
-|----------|---------|
-| `MONGODB_URI` | MongoDB Atlas connection string |
-| `SERVER_PORT` | Optional. Defaults to `8080` |
-
-### Docker
-
-```powershell
-docker build -t radio-streaming-api .
-docker run -p 8080:8080 -e MONGODB_URI="mongodb+srv://USER:PASS@cluster0.example.mongodb.net/divine_bliss_streaming" radio-streaming-api
-```
-
-Connect this GitHub repo to Railway, Render, Fly.io, or Cloud Run and deploy from `main`.
