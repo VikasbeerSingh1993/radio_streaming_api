@@ -2,6 +2,7 @@ package com.radiostreaming.api.service;
 
 import com.radiostreaming.api.dto.AdminProfile;
 import com.radiostreaming.api.dto.AdminUserRequest;
+import com.radiostreaming.api.dto.PageResponse;
 import com.radiostreaming.api.model.AdminPermissions;
 import com.radiostreaming.api.model.AdminUser;
 import com.radiostreaming.api.repository.AdminUserRepository;
@@ -40,6 +41,10 @@ public class AdminUserService {
         return accessService.visibleUsers(actor, adminDirectory.list(), query).stream()
                 .map(AdminProfile::from)
                 .toList();
+    }
+
+    public PageResponse<AdminProfile> list(AdminUser actor, String query, int page, int size) {
+        return PageResponse.of(list(actor, query), page, size);
     }
 
     public AdminProfile create(AdminUser actor, AdminUserRequest request) {

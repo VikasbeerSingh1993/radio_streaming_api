@@ -96,6 +96,22 @@ class RadioCacheServiceTest {
     }
 
     @Test
+    void upsertEventUpdatesCacheWithoutReloadingDatabase() {
+        cacheService.getAllEventsForAdmin();
+        EventDocument created = new EventDocument();
+        created.setId("event-2");
+        created.setTitle("Cached Sangat");
+        created.setApprovalStatus("approved");
+
+        cacheService.upsertEvent(created);
+
+        List<EventDocument> events = cacheService.getAllEventsForAdmin();
+        assertEquals(2, events.size());
+        assertEquals("Cached Sangat", events.getFirst().getTitle());
+        verify(dataService, times(1)).getAllEvents();
+    }
+
+    @Test
     void hidesPendingEventsFromPublicList() {
         EventDocument pending = new EventDocument();
         pending.setTitle("Pending Sangat");

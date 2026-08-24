@@ -157,6 +157,50 @@ public class RadioCacheService {
         return statusOf(loaded, "database");
     }
 
+    public void upsertEvent(EventDocument event) {
+        mutate(current -> replaceOrAdd(current.events, event, EventDocument::getId));
+    }
+
+    public void removeEvent(String id) {
+        mutate(current -> current.events.removeIf(item -> sameId(item.getId(), id)));
+    }
+
+    public void upsertStation(StationDocument station) {
+        mutate(current -> replaceOrAdd(current.stations, station, StationDocument::getId));
+    }
+
+    public void removeStation(String id) {
+        mutate(current -> {
+            current.stations.removeIf(item -> sameId(item.getId(), id));
+            current.audioLinksByStation.remove(RadioDataService.cleanId(id));
+        });
+    }
+
+    public void upsertCategory(CategoryDocument category) {
+        mutate(current -> replaceOrAdd(current.categories, category, CategoryDocument::getId));
+    }
+
+    public void removeCategory(String id) {
+        mutate(current -> current.categories.removeIf(item -> sameId(item.getId(), id)));
+    }
+
+    public void upsertAudioLink(AudioLinkDocument link) {
+        mutate(current -> {
+            if (link == null || link.getId() == null) {
+                return;
+            }
+            removeLink(current, link.getId());
+            String stationId = RadioDataService.cleanId(link.getStationId());
+            current.audioLinksByStation
+                    .computeIfAbsent(stationId, key -> new ArrayList<>())
+                    .add(link);
+        });
+    }
+
+    public void removeAudioLink(String id) {
+        mutate(current -> removeLink(current, id));
+    }
+
     public Map<String, Object> status() {
         Snapshot current = snapshot;
         if (current == null) {
@@ -265,8 +309,53 @@ public class RadioCacheService {
         body.put("stations", current.stations.size());
         body.put("categories", current.categories.size());
         body.put("events", current.events.size());
-        body.put("audioLinks", current.audioLinkCount);
+        body.put("audioLinks", audioLinkCount(current));
         return body;
+    }
+
+    private void mutate(java.util.function.Consumer<Snapshot> action) {
+        lock.lock();
+        try {
+            Snapshot current = snapshot;
+            if (current == null) {
+                return;
+            }
+            action.accept(current);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private static void removeLink(Snapshot current, String id) {
+        for (List<AudioLinkDocument> links : current.audioLinksByStation.values()) {
+            links.removeIf(item -> sameId(item.getId(), id));
+        }
+    }
+
+    private static <T> void replaceOrAdd(List<T> items, T item, java.util.function.Function<T, String> idFn) {
+        if (item == null || idFn.apply(item) == null) {
+            return;
+        }
+        String id = idFn.apply(item);
+        for (int i = 0; i < items.size(); i++) {
+            if (sameId(idFn.apply(items.get(i)), id)) {
+                items.set(i, item);
+                return;
+            }
+        }
+        items.add(0, item);
+    }
+
+    private static boolean sameId(String left, String right) {
+        return RadioDataService.cleanId(left).equals(RadioDataService.cleanId(right));
+    }
+
+    private static int audioLinkCount(Snapshot current) {
+        int count = 0;
+        for (List<AudioLinkDocument> links : current.audioLinksByStation.values()) {
+            count += links.size();
+        }
+        return count;
     }
 
     private record Snapshot(

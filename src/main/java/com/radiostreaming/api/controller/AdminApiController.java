@@ -3,6 +3,7 @@ package com.radiostreaming.api.controller;
 import com.radiostreaming.api.dto.AdminProfile;
 import com.radiostreaming.api.dto.AdminUserRequest;
 import com.radiostreaming.api.dto.EventApprovalRequest;
+import com.radiostreaming.api.dto.PageResponse;
 import com.radiostreaming.api.model.AudioLinkDocument;
 import com.radiostreaming.api.model.CategoryDocument;
 import com.radiostreaming.api.model.EventDocument;
@@ -50,8 +51,12 @@ public class AdminApiController {
     }
 
     @GetMapping("/events")
-    public List<EventDocument> listEvents(@RequestParam(required = false) String q) {
-        return adminCatalogService.listEvents(currentAdmin.require(), q);
+    public PageResponse<EventDocument> listEvents(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return adminCatalogService.pageEvents(currentAdmin.require(), q, status, page, size);
     }
 
     @GetMapping("/events/{id}")
@@ -91,8 +96,11 @@ public class AdminApiController {
     }
 
     @GetMapping("/stations")
-    public List<StationDocument> listStations(@RequestParam(required = false) String q) {
-        return adminCatalogService.listStations(currentAdmin.require(), q);
+    public PageResponse<StationDocument> listStations(
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return adminCatalogService.pageStations(currentAdmin.require(), q, page, size);
     }
 
     @PostMapping("/stations")
@@ -113,8 +121,11 @@ public class AdminApiController {
     }
 
     @GetMapping("/categories")
-    public List<CategoryDocument> listCategories(@RequestParam(required = false) String q) {
-        return adminCatalogService.listCategories(currentAdmin.require(), q);
+    public PageResponse<CategoryDocument> listCategories(
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return adminCatalogService.pageCategories(currentAdmin.require(), q, page, size);
     }
 
     @PostMapping("/categories")
@@ -135,8 +146,12 @@ public class AdminApiController {
     }
 
     @GetMapping("/audio-links")
-    public List<AudioLinkDocument> listAudioLinks(@RequestParam(required = false) String q) {
-        return adminCatalogService.listAudioLinks(currentAdmin.require(), q);
+    public PageResponse<AudioLinkDocument> listAudioLinks(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String stationId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return adminCatalogService.pageAudioLinks(currentAdmin.require(), q, stationId, page, size);
     }
 
     @GetMapping("/audio-links/station/{stationId}")
@@ -162,8 +177,11 @@ public class AdminApiController {
     }
 
     @GetMapping("/users")
-    public List<AdminProfile> listUsers(@RequestParam(required = false) String q) {
-        return adminUserService.list(currentAdmin.require(), q);
+    public PageResponse<AdminProfile> listUsers(
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return adminUserService.list(currentAdmin.require(), q, page, size);
     }
 
     @PostMapping("/users")

@@ -2,6 +2,7 @@ package com.radiostreaming.api.service;
 
 import com.radiostreaming.api.dto.EventApprovalRequest;
 import com.radiostreaming.api.dto.EventSubmitRequest;
+import com.radiostreaming.api.dto.PageResponse;
 import com.radiostreaming.api.model.AdminUser;
 import com.radiostreaming.api.model.AudioLinkDocument;
 import com.radiostreaming.api.model.CategoryDocument;
@@ -93,12 +94,27 @@ public class AdminCatalogService {
         event.setSubmitterPhone(trimToEmpty(request.getSubmitterPhone()));
         event.setSubmittedAt(Instant.now());
         event.setCreatedBy("public");
-        return eventRepository.save(event);
+        EventDocument saved = eventRepository.save(event);
+        radioCacheService.upsertEvent(saved);
+        return saved;
     }
 
     public List<EventDocument> listEvents(AdminUser user, String query) {
+        return listEvents(user, query, "all");
+    }
+
+    public List<EventDocument> listEvents(AdminUser user, String query, String status) {
         accessService.assertCan(user, AdminModule.EVENTS, AdminAction.READ);
-        return accessService.visibleEvents(user, radioCacheService.getAllEventsForAdmin(), query);
+        List<EventDocument> events = accessService.visibleEvents(user, radioCacheService.getAllEventsForAdmin(), query);
+        if (status != null && !status.isBlank() && !"all".equalsIgnoreCase(status)) {
+            String wanted = status.toLowerCase();
+            events = events.stream().filter(event -> wanted.equals(eventStatus(event))).toList();
+        }
+        return events;
+    }
+
+    public PageResponse<EventDocument> pageEvents(AdminUser user, String query, String status, int page, int size) {
+        return PageResponse.of(listEvents(user, query, status), page, size);
     }
 
     public EventDocument getEvent(AdminUser user, String id) {
@@ -149,7 +165,7 @@ public class AdminCatalogService {
         accessService.assertCan(user, AdminModule.EVENTS, AdminAction.DELETE);
         accessService.assertEventInScope(user, existing);
         eventRepository.deleteById(id);
-        reloadCache();
+        radioCacheService.removeEvent(id);
     }
 
     public EventDocument approveEvent(AdminUser user, String id, EventApprovalRequest request) {
@@ -165,6 +181,10 @@ public class AdminCatalogService {
         return accessService.visibleStations(user, radioCacheService.getStationsForAdmin(), query);
     }
 
+    public PageResponse<StationDocument> pageStations(AdminUser user, String query, int page, int size) {
+        return PageResponse.of(listStations(user, query), page, size);
+    }
+
     public StationDocument saveStation(AdminUser user, StationDocument station) {
         accessService.assertCan(user, AdminModule.STATIONS, AdminAction.CREATE);
         accessService.assertStationCategoryAllowed(user, station.getCategory());
@@ -174,7 +194,7 @@ public class AdminCatalogService {
             station.setCreatedAt(Instant.now());
         }
         StationDocument saved = stationRepository.save(station);
-        reloadCache();
+        radioCacheService.upsertStation(saved);
         return saved;
     }
 
@@ -194,7 +214,7 @@ public class AdminCatalogService {
             incoming.setCreatedBy(existing.getCreatedBy());
         }
         StationDocument saved = stationRepository.save(incoming);
-        reloadCache();
+        radioCacheService.upsertStation(saved);
         return saved;
     }
 
@@ -207,12 +227,16 @@ public class AdminCatalogService {
         }
         audioLinkRepository.deleteByStationId(id);
         stationRepository.deleteById(id);
-        reloadCache();
+        radioCacheService.removeStation(id);
     }
 
     public List<CategoryDocument> listCategories(AdminUser user, String query) {
         accessService.assertCan(user, AdminModule.CATEGORIES, AdminAction.READ);
         return accessService.visibleCategories(user, radioCacheService.getCategoriesForAdmin(), query);
+    }
+
+    public PageResponse<CategoryDocument> pageCategories(AdminUser user, String query, int page, int size) {
+        return PageResponse.of(listCategories(user, query), page, size);
     }
 
     public CategoryDocument saveCategory(AdminUser user, CategoryDocument category) {
@@ -224,7 +248,7 @@ public class AdminCatalogService {
         }
         CategoryDocument saved = categoryRepository.save(category);
         grantCategoryToSubAdmin(user, saved.getCategory());
-        reloadCache();
+        radioCacheService.upsertCategory(saved);
         return saved;
     }
 
@@ -243,7 +267,7 @@ public class AdminCatalogService {
             incoming.setCreatedBy(existing.getCreatedBy());
         }
         CategoryDocument saved = categoryRepository.save(incoming);
-        reloadCache();
+        radioCacheService.upsertCategory(saved);
         return saved;
     }
 
@@ -255,16 +279,31 @@ public class AdminCatalogService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This category is outside your assigned access");
         }
         categoryRepository.deleteById(id);
-        reloadCache();
+        radioCacheService.removeCategory(id);
     }
 
     public List<AudioLinkDocument> listAudioLinks(AdminUser user, String query) {
+        return listAudioLinks(user, query, null);
+    }
+
+    public List<AudioLinkDocument> listAudioLinks(AdminUser user, String query, String stationId) {
         accessService.assertCan(user, AdminModule.AUDIO_LINKS, AdminAction.READ);
-        return accessService.visibleLinks(
+        List<AudioLinkDocument> links = accessService.visibleLinks(
                 user,
                 radioCacheService.getAllAudioLinksForAdmin(),
                 radioCacheService.stationsByIdForAdmin(),
                 query);
+        if (stationId != null && !stationId.isBlank()) {
+            String wanted = RadioDataService.cleanId(stationId);
+            links = links.stream()
+                    .filter(link -> wanted.equals(RadioDataService.cleanId(link.getStationId())))
+                    .toList();
+        }
+        return links;
+    }
+
+    public PageResponse<AudioLinkDocument> pageAudioLinks(AdminUser user, String query, String stationId, int page, int size) {
+        return PageResponse.of(listAudioLinks(user, query, stationId), page, size);
     }
 
     public List<AudioLinkDocument> listAudioLinksByStation(AdminUser user, String stationId) {
@@ -286,7 +325,7 @@ public class AdminCatalogService {
         link.setId(null);
         link.setCreatedBy(user.getUsername());
         AudioLinkDocument saved = audioLinkRepository.save(link);
-        reloadCache();
+        radioCacheService.upsertAudioLink(saved);
         return saved;
     }
 
@@ -312,7 +351,7 @@ public class AdminCatalogService {
             accessService.assertStationCategoryAllowed(user, station.getCategory());
         }
         AudioLinkDocument saved = audioLinkRepository.save(incoming);
-        reloadCache();
+        radioCacheService.upsertAudioLink(saved);
         return saved;
     }
 
@@ -326,7 +365,7 @@ public class AdminCatalogService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This audio link is outside your assigned access");
         }
         audioLinkRepository.deleteById(id);
-        reloadCache();
+        radioCacheService.removeAudioLink(id);
     }
 
     public Map<String, Object> reloadCache() {
@@ -353,7 +392,7 @@ public class AdminCatalogService {
             event.setEndDate(event.getDate());
         }
         EventDocument saved = eventRepository.save(event);
-        reloadCache();
+        radioCacheService.upsertEvent(saved);
         return saved;
     }
 
@@ -418,6 +457,13 @@ public class AdminCatalogService {
         if (link.getStatus() == null || link.getStatus().isBlank()) {
             link.setStatus(Boolean.TRUE.equals(link.getPlayed()) ? "Y" : "N");
         }
+    }
+
+    private static String eventStatus(EventDocument event) {
+        if (event.getApprovalStatus() == null || event.getApprovalStatus().isBlank()) {
+            return "approved";
+        }
+        return event.getApprovalStatus().toLowerCase();
     }
 
     private static String trimToEmpty(String value) {

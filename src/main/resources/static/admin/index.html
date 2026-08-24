@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/admin/css/admin.css?v=20260824b">
+  <link rel="stylesheet" href="/admin/css/admin.css?v=20260824c">
 </head>
 <body>
   <div id="admin-boot" style="min-height:100vh;display:grid;place-items:center;background:#eef2f7;color:#5b6b7c;font-family:sans-serif">Loading admin console...</div>
@@ -60,8 +60,26 @@
       </header>
       <div class="flash" ng-class="{error: $root.flash.error}" ng-if="$root.flash" ng-click="clearFlash()">{{$root.flash.text}}</div>
       <div class="page" ng-view></div>
+      <div class="busy-overlay" ng-if="busy">
+        <div class="busy-card">
+          <div class="spinner"></div>
+          <p>{{busy}}</p>
+        </div>
+      </div>
     </section>
   </div>
+
+  <script type="text/ng-template" id="pager.html">
+    <div class="pager" ng-show="total > 0">
+      <span>Showing {{pageStart}}–{{pageEnd}} of {{total}}</span>
+      <div class="pager-controls">
+        <select ng-model="$parent.size" ng-change="changeSize()" ng-options="n for n in [10,20,50]"></select>
+        <button class="btn btn-ghost btn-sm" type="button" ng-disabled="page<=0 || pageLoading" ng-click="prevPage()">Previous</button>
+        <span>Page {{page + 1}} of {{totalPages}}</span>
+        <button class="btn btn-ghost btn-sm" type="button" ng-disabled="page>=totalPages-1 || pageLoading" ng-click="nextPage()">Next</button>
+      </div>
+    </div>
+  </script>
 
   <script type="text/ng-template" id="dashboard.html">
     <div class="page-head">
@@ -97,13 +115,17 @@
       <button class="btn btn-info btn-sm icon-btn" title="Refresh from database" ng-click="refresh()" ng-disabled="refreshing">↻</button>
     </div>
     <div class="filters">
-      <button class="chip" ng-class="{active: filter==='pending'}" ng-click="filter='pending'">Pending</button>
-      <button class="chip" ng-class="{active: filter==='approved'}" ng-click="filter='approved'">Approved</button>
-      <button class="chip" ng-class="{active: filter==='rejected'}" ng-click="filter='rejected'">Rejected</button>
-      <button class="chip" ng-class="{active: filter==='all'}" ng-click="filter='all'">All</button>
+      <button class="chip" ng-class="{active: filter==='pending'}" ng-click="setFilter('pending')">Pending</button>
+      <button class="chip" ng-class="{active: filter==='approved'}" ng-click="setFilter('approved')">Approved</button>
+      <button class="chip" ng-class="{active: filter==='rejected'}" ng-click="setFilter('rejected')">Rejected</button>
+      <button class="chip" ng-class="{active: filter==='all'}" ng-click="setFilter('all')">All</button>
     </div>
     <div class="panel table-wrap">
-      <table>
+      <div class="table-loader" ng-if="pageLoading && !items.length">
+        <div class="spinner"></div>
+        <p>Loading events...</p>
+      </div>
+      <table ng-if="items.length">
         <thead>
           <tr>
             <th>Event</th>
@@ -114,7 +136,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr ng-repeat="event in filtered()">
+          <tr ng-repeat="event in items track by event._id">
             <td>
               <strong>{{event.title}}</strong>
               <div class="muted">{{event.city}} · {{event.address}}</div>
@@ -131,22 +153,23 @@
               </span>
             </td>
             <td class="row-actions">
-              <button class="btn btn-success btn-sm" ng-if="can('events','approve') && event.approvalStatus==='pending'" ng-click="approve(event)">Approve</button>
-              <button class="btn btn-danger btn-sm" ng-if="can('events','approve') && event.approvalStatus==='pending'" ng-click="reject(event)">Reject</button>
-              <button class="btn btn-ghost btn-sm" ng-if="can('events','update')" ng-click="openEdit(event)">Edit</button>
-              <button class="btn btn-danger btn-sm" ng-if="can('events','delete')" ng-click="remove(event)">Delete</button>
+              <button class="btn btn-success btn-sm" ng-if="can('events','approve') && event.approvalStatus==='pending'" ng-click="approve(event)" ng-disabled="saving">Approve</button>
+              <button class="btn btn-danger btn-sm" ng-if="can('events','approve') && event.approvalStatus==='pending'" ng-click="reject(event)" ng-disabled="saving">Reject</button>
+              <button class="btn btn-ghost btn-sm" ng-if="can('events','update')" ng-click="openEdit(event)" ng-disabled="saving">Edit</button>
+              <button class="btn btn-danger btn-sm" ng-if="can('events','delete')" ng-click="remove(event)" ng-disabled="saving">Delete</button>
             </td>
           </tr>
         </tbody>
       </table>
-      <p class="muted" ng-if="!filtered().length">No events in this view.</p>
+      <p class="muted" ng-if="!pageLoading && !items.length">No events in this view.</p>
+      <div ng-include="'pager.html'"></div>
     </div>
 
     <div class="modal-backdrop" ng-if="form" ng-click="closeForm()">
       <form class="modal" novalidate ng-submit="save()" ng-click="$event.stopPropagation()">
         <div class="modal-head">
           <h2>{{form._id ? 'Edit Event' : 'New Event'}}</h2>
-          <button class="close-btn" type="button" title="Close" ng-click="closeForm()">&times;</button>
+          <button class="close-btn" type="button" title="Close" ng-click="closeForm()" ng-disabled="saving">&times;</button>
         </div>
         <div class="form-error" ng-if="formError">{{formError}}</div>
         <div class="grid-2">
@@ -179,8 +202,11 @@
         <label class="field"><span>Description</span><textarea ng-model="form.description"></textarea></label>
         <label class="field"><span>Review Note</span><input ng-model="form.reviewNote"></label>
         <div class="modal-actions">
-          <button class="btn btn-ghost btn-sm" type="button" ng-click="closeForm()">Cancel</button>
-          <button class="btn btn-primary btn-sm" type="submit">Save</button>
+          <button class="btn btn-ghost btn-sm" type="button" ng-click="closeForm()" ng-disabled="saving">Cancel</button>
+          <button class="btn btn-primary btn-sm" type="submit" ng-disabled="saving">
+            <span ng-hide="saving">Save</span>
+            <span ng-show="saving">Saving...</span>
+          </button>
         </div>
       </form>
     </div>
@@ -200,27 +226,33 @@
       <button class="btn btn-info btn-sm icon-btn" title="Refresh from database" ng-click="refresh()" ng-disabled="refreshing">↻</button>
     </div>
     <div class="panel table-wrap">
-      <table>
+      <div class="table-loader" ng-if="pageLoading && !items.length">
+        <div class="spinner"></div>
+        <p>Loading stations...</p>
+      </div>
+      <table ng-if="items.length">
         <thead><tr><th>Name</th><th>Category</th><th>Language</th><th>Live</th><th></th></tr></thead>
         <tbody>
-          <tr ng-repeat="station in stations">
+          <tr ng-repeat="station in items track by station._id">
             <td><strong>{{station | stationName}}</strong></td>
             <td>{{station.category}}</td>
             <td>{{station.language}}</td>
             <td>{{station.live ? 'Yes' : 'No'}}</td>
             <td class="row-actions">
-              <button class="btn btn-ghost btn-sm" ng-if="can('stations','update')" ng-click="openEdit(station)">Edit</button>
-              <button class="btn btn-danger btn-sm" ng-if="can('stations','delete')" ng-click="remove(station)">Delete</button>
+              <button class="btn btn-ghost btn-sm" ng-if="can('stations','update')" ng-click="openEdit(station)" ng-disabled="saving">Edit</button>
+              <button class="btn btn-danger btn-sm" ng-if="can('stations','delete')" ng-click="remove(station)" ng-disabled="saving">Delete</button>
             </td>
           </tr>
         </tbody>
       </table>
+      <p class="muted" ng-if="!pageLoading && !items.length">No stations in this view.</p>
+      <div ng-include="'pager.html'"></div>
     </div>
     <div class="modal-backdrop" ng-if="form" ng-click="closeForm()">
       <form class="modal" novalidate ng-submit="save()" ng-click="$event.stopPropagation()">
         <div class="modal-head">
           <h2>{{form._id ? 'Edit Station' : 'New Station'}}</h2>
-          <button class="close-btn" type="button" title="Close" ng-click="closeForm()">&times;</button>
+          <button class="close-btn" type="button" title="Close" ng-click="closeForm()" ng-disabled="saving">&times;</button>
         </div>
         <div class="form-error" ng-if="formError">{{formError}}</div>
         <div class="grid-2">
@@ -228,7 +260,7 @@
           <label class="field"><span>Hindi Name</span><input ng-model="form.nameHi"></label>
           <label class="field">
             <span>Category</span>
-            <select ng-model="form.category" ng-options="cat.category as (cat | categoryName) for cat in categories">
+            <select ng-model="form.category" ng-options="cat.category as (cat | categoryName) for cat in lookupCategories">
               <option value="">Select Category</option>
             </select>
           </label>
@@ -245,8 +277,11 @@
           <label class="check-pill" style="align-self:end;margin-bottom:14px"><input type="checkbox" ng-model="form.live"> Live Station</label>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-ghost btn-sm" type="button" ng-click="closeForm()">Cancel</button>
-          <button class="btn btn-primary btn-sm" type="submit">Save</button>
+          <button class="btn btn-ghost btn-sm" type="button" ng-click="closeForm()" ng-disabled="saving">Cancel</button>
+          <button class="btn btn-primary btn-sm" type="submit" ng-disabled="saving">
+            <span ng-hide="saving">Save</span>
+            <span ng-show="saving">Saving...</span>
+          </button>
         </div>
       </form>
     </div>
@@ -266,26 +301,32 @@
       <button class="btn btn-info btn-sm icon-btn" title="Refresh from database" ng-click="refresh()" ng-disabled="refreshing">↻</button>
     </div>
     <div class="panel table-wrap">
-      <table>
+      <div class="table-loader" ng-if="pageLoading && !items.length">
+        <div class="spinner"></div>
+        <p>Loading categories...</p>
+      </div>
+      <table ng-if="items.length">
         <thead><tr><th>Key</th><th>Name</th><th>Order</th><th></th></tr></thead>
         <tbody>
-          <tr ng-repeat="category in categories">
+          <tr ng-repeat="category in items track by category._id">
             <td>{{category.category}}</td>
             <td>{{(category.translations && category.translations.en && category.translations.en.name) || category.category}}</td>
             <td>{{category.order}}</td>
             <td class="row-actions">
-              <button class="btn btn-ghost btn-sm" ng-if="can('categories','update')" ng-click="openEdit(category)">Edit</button>
-              <button class="btn btn-danger btn-sm" ng-if="can('categories','delete')" ng-click="remove(category)">Delete</button>
+              <button class="btn btn-ghost btn-sm" ng-if="can('categories','update')" ng-click="openEdit(category)" ng-disabled="saving">Edit</button>
+              <button class="btn btn-danger btn-sm" ng-if="can('categories','delete')" ng-click="remove(category)" ng-disabled="saving">Delete</button>
             </td>
           </tr>
         </tbody>
       </table>
+      <p class="muted" ng-if="!pageLoading && !items.length">No categories in this view.</p>
+      <div ng-include="'pager.html'"></div>
     </div>
     <div class="modal-backdrop" ng-if="form" ng-click="closeForm()">
       <form class="modal" novalidate ng-submit="save()" ng-click="$event.stopPropagation()">
         <div class="modal-head">
           <h2>{{form._id ? 'Edit Category' : 'New Category'}}</h2>
-          <button class="close-btn" type="button" title="Close" ng-click="closeForm()">&times;</button>
+          <button class="close-btn" type="button" title="Close" ng-click="closeForm()" ng-disabled="saving">&times;</button>
         </div>
         <div class="form-error" ng-if="formError">{{formError}}</div>
         <div class="grid-2">
@@ -296,8 +337,11 @@
           <label class="field"><span>Icon</span><input ng-model="form.icon"></label>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-ghost btn-sm" type="button" ng-click="closeForm()">Cancel</button>
-          <button class="btn btn-primary btn-sm" type="submit">Save</button>
+          <button class="btn btn-ghost btn-sm" type="button" ng-click="closeForm()" ng-disabled="saving">Cancel</button>
+          <button class="btn btn-primary btn-sm" type="submit" ng-disabled="saving">
+            <span ng-hide="saving">Save</span>
+            <span ng-show="saving">Saving...</span>
+          </button>
         </div>
       </form>
     </div>
@@ -317,40 +361,45 @@
       <button class="btn btn-info btn-sm icon-btn" title="Refresh from database" ng-click="refresh()" ng-disabled="refreshing">↻</button>
     </div>
     <div class="filters">
-      <select class="search-input" ng-model="stationFilter">
+      <select class="search-input" ng-model="stationFilter" ng-change="setStationFilter()" ng-options="station._id as (station | stationName) for station in lookupStations">
         <option value="">All stations</option>
-        <option ng-repeat="station in stations" value="{{station._id}}">{{station | stationName}}</option>
       </select>
     </div>
     <div class="panel table-wrap">
-      <table>
+      <div class="table-loader" ng-if="pageLoading && !items.length">
+        <div class="spinner"></div>
+        <p>Loading audio links...</p>
+      </div>
+      <table ng-if="items.length">
         <thead><tr><th>Title</th><th>Station</th><th>Sequence</th><th>URL</th><th></th></tr></thead>
         <tbody>
-          <tr ng-repeat="link in filtered()">
+          <tr ng-repeat="link in items track by link._id">
             <td>{{(link.translations && link.translations.en && link.translations.en.name) || 'Track'}}</td>
             <td>{{link.station_id}}</td>
             <td>{{link.sequence}}</td>
             <td class="muted">{{link.url}}</td>
             <td class="row-actions">
-              <button class="btn btn-ghost btn-sm" ng-if="can('audioLinks','update')" ng-click="openEdit(link)">Edit</button>
-              <button class="btn btn-danger btn-sm" ng-if="can('audioLinks','delete')" ng-click="remove(link)">Delete</button>
+              <button class="btn btn-ghost btn-sm" ng-if="can('audioLinks','update')" ng-click="openEdit(link)" ng-disabled="saving">Edit</button>
+              <button class="btn btn-danger btn-sm" ng-if="can('audioLinks','delete')" ng-click="remove(link)" ng-disabled="saving">Delete</button>
             </td>
           </tr>
         </tbody>
       </table>
+      <p class="muted" ng-if="!pageLoading && !items.length">No audio links in this view.</p>
+      <div ng-include="'pager.html'"></div>
     </div>
     <div class="modal-backdrop" ng-if="form" ng-click="closeForm()">
       <form class="modal" novalidate ng-submit="save()" ng-click="$event.stopPropagation()">
         <div class="modal-head">
           <h2>{{form._id ? 'Edit Audio Link' : 'New Audio Link'}}</h2>
-          <button class="close-btn" type="button" title="Close" ng-click="closeForm()">&times;</button>
+          <button class="close-btn" type="button" title="Close" ng-click="closeForm()" ng-disabled="saving">&times;</button>
         </div>
         <div class="form-error" ng-if="formError">{{formError}}</div>
         <div class="grid-2">
           <label class="field"><span>Title</span><input ng-model="form.nameEn"></label>
           <label class="field">
             <span>Station</span>
-            <select ng-model="form.station_id" ng-options="station._id as (station | stationName) for station in stations">
+            <select ng-model="form.station_id" ng-options="station._id as (station | stationName) for station in lookupStations">
               <option value="">Select Station</option>
             </select>
           </label>
@@ -358,8 +407,11 @@
           <label class="field"><span>URL</span><input ng-model="form.url"></label>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-ghost btn-sm" type="button" ng-click="closeForm()">Cancel</button>
-          <button class="btn btn-primary btn-sm" type="submit">Save</button>
+          <button class="btn btn-ghost btn-sm" type="button" ng-click="closeForm()" ng-disabled="saving">Cancel</button>
+          <button class="btn btn-primary btn-sm" type="submit" ng-disabled="saving">
+            <span ng-hide="saving">Save</span>
+            <span ng-show="saving">Saving...</span>
+          </button>
         </div>
       </form>
     </div>
@@ -379,10 +431,14 @@
       <button class="btn btn-info btn-sm icon-btn" title="Refresh from database" ng-click="refresh()" ng-disabled="refreshing">↻</button>
     </div>
     <div class="panel table-wrap">
-      <table>
+      <div class="table-loader" ng-if="pageLoading && !items.length">
+        <div class="spinner"></div>
+        <p>Loading users...</p>
+      </div>
+      <table ng-if="items.length">
         <thead><tr><th>User</th><th>Role</th><th>Organization</th><th>Access</th><th></th></tr></thead>
         <tbody>
-          <tr ng-repeat="user in users">
+          <tr ng-repeat="user in items track by user.id">
             <td>
               <strong>{{user.displayName || user.username}}</strong>
               <div class="muted">{{user.username}}</div>
@@ -396,18 +452,20 @@
               <span ng-if="!user.superAdmin && user.allowedOrganizations.length"> · org {{user.allowedOrganizations.join(', ')}}</span>
             </td>
             <td class="row-actions">
-              <button class="btn btn-ghost btn-sm" ng-if="can('users','update')" ng-click="openEdit(user)">Edit</button>
-              <button class="btn btn-danger btn-sm" ng-if="can('users','delete')" ng-click="remove(user)">Delete</button>
+              <button class="btn btn-ghost btn-sm" ng-if="can('users','update')" ng-click="openEdit(user)" ng-disabled="saving">Edit</button>
+              <button class="btn btn-danger btn-sm" ng-if="can('users','delete')" ng-click="remove(user)" ng-disabled="saving">Delete</button>
             </td>
           </tr>
         </tbody>
       </table>
+      <p class="muted" ng-if="!pageLoading && !items.length">No users in this view.</p>
+      <div ng-include="'pager.html'"></div>
     </div>
     <div class="modal-backdrop" ng-if="form" ng-click="closeForm()">
       <form class="modal" novalidate ng-submit="save()" ng-click="$event.stopPropagation()">
         <div class="modal-head">
           <h2>{{form.id ? 'Edit User' : 'New Sub-Admin'}}</h2>
-          <button class="close-btn" type="button" title="Close" ng-click="closeForm()">&times;</button>
+          <button class="close-btn" type="button" title="Close" ng-click="closeForm()" ng-disabled="saving">&times;</button>
         </div>
         <div class="form-error" ng-if="formError">{{formError}}</div>
         <div class="grid-2">
@@ -452,17 +510,20 @@
           <div class="field">
             <span>Allowed Categories (Stations And Links Follow These)</span>
             <div class="check-grid">
-              <label class="check-pill" ng-repeat="cat in categories">
+              <label class="check-pill" ng-repeat="cat in lookupCategories">
                 <input type="checkbox" ng-checked="hasCategory(cat.category)" ng-click="toggleCategory(cat.category)">
                 {{cat | categoryName}}
               </label>
-              <span class="muted" ng-if="!categories.length">Leave empty to allow every category they can read.</span>
+              <span class="muted" ng-if="!lookupCategories.length">Leave empty to allow every category they can read.</span>
             </div>
           </div>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-ghost btn-sm" type="button" ng-click="closeForm()">Cancel</button>
-          <button class="btn btn-primary btn-sm" type="submit">Save</button>
+          <button class="btn btn-ghost btn-sm" type="button" ng-click="closeForm()" ng-disabled="saving">Cancel</button>
+          <button class="btn btn-primary btn-sm" type="submit" ng-disabled="saving">
+            <span ng-hide="saving">Save</span>
+            <span ng-show="saving">Saving...</span>
+          </button>
         </div>
       </form>
     </div>
@@ -497,7 +558,7 @@
           "https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.8.3/angular-route.min.js"
         ]);
       }).then(function () {
-        return loadScript("/admin/js/app.js?v=20260824b");
+        return loadScript("/admin/js/app.js?v=20260824c");
       }).then(function () {
         var boot = document.getElementById("admin-boot");
         if (boot) { boot.remove(); }

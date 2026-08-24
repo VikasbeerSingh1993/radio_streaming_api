@@ -2,6 +2,7 @@
   "use strict";
 
   var app = angular.module("adminApp", ["ngRoute"]);
+  var PAGE_SIZE = 20;
 
   function emptyPermissions() {
     return {
@@ -27,6 +28,21 @@
       $httpProvider.interceptors.push("AuthInterceptor");
     }]);
 
+  app.run(["$rootScope", function ($rootScope) {
+    var busyCount = 0;
+    $rootScope.busy = null;
+    $rootScope.showBusy = function (message) {
+      busyCount += 1;
+      $rootScope.busy = message || "Please wait...";
+    };
+    $rootScope.hideBusy = function () {
+      busyCount = Math.max(0, busyCount - 1);
+      if (busyCount === 0) {
+        $rootScope.busy = null;
+      }
+    };
+  }]);
+
   app.factory("AuthService", ["$window", function ($window) {
     var tokenKey = "radioAdminToken";
     var profileKey = "radioAdminProfile";
@@ -43,6 +59,33 @@
       clear: function () {
         $window.localStorage.removeItem(tokenKey);
         $window.localStorage.removeItem(profileKey);
+      }
+    };
+  }]);
+
+  app.factory("CatalogStore", ["$window", function ($window) {
+    var mem = {};
+    function storageKey(name) { return "radioAdminCache:" + name; }
+    return {
+      get: function (name) {
+        if (Object.prototype.hasOwnProperty.call(mem, name)) { return mem[name]; }
+        try { mem[name] = JSON.parse($window.sessionStorage.getItem(storageKey(name)) || "null"); }
+        catch (e) { mem[name] = null; }
+        return mem[name];
+      },
+      set: function (name, value) {
+        mem[name] = value;
+        try { $window.sessionStorage.setItem(storageKey(name), JSON.stringify(value)); } catch (e) {}
+      },
+      clear: function () {
+        mem = {};
+        try {
+          Object.keys($window.sessionStorage).forEach(function (key) {
+            if (key.indexOf("radioAdminCache:") === 0) {
+              $window.sessionStorage.removeItem(key);
+            }
+          });
+        } catch (e) {}
       }
     };
   }]);
@@ -75,37 +118,42 @@
 
   app.factory("Api", ["$http", function ($http) {
     var base = "/api/admin";
-    function list(path, q) {
-      return $http.get(base + path, { params: q ? { q: q } : {} });
+    function page(path, params) {
+      var query = { page: params && params.page || 0, size: params && params.size || PAGE_SIZE };
+      if (params && params.q) { query.q = params.q; }
+      if (params && params.status) { query.status = params.status; }
+      if (params && params.stationId) { query.stationId = params.stationId; }
+      return $http.get(base + path, { params: query });
     }
     return {
       login: function (body) { return $http.post(base + "/login", body); },
       me: function () { return $http.get(base + "/me"); },
       stats: function () { return $http.get(base + "/stats"); },
       reload: function () { return $http.post(base + "/cache/reload"); },
-      events: function (q) { return list("/events", q); },
+      event: function (id) { return $http.get(base + "/events/" + id); },
+      events: function (params) { return page("/events", params); },
       saveEvent: function (item) {
         return item._id ? $http.put(base + "/events/" + item._id, item) : $http.post(base + "/events", item);
       },
       deleteEvent: function (id) { return $http.delete(base + "/events/" + id); },
       approve: function (id, note) { return $http.post(base + "/events/" + id + "/approve", { reviewNote: note || "" }); },
       reject: function (id, note) { return $http.post(base + "/events/" + id + "/reject", { reviewNote: note || "" }); },
-      stations: function (q) { return list("/stations", q); },
+      stations: function (params) { return page("/stations", params); },
       saveStation: function (item) {
         return item._id ? $http.put(base + "/stations/" + item._id, item) : $http.post(base + "/stations", item);
       },
       deleteStation: function (id) { return $http.delete(base + "/stations/" + id); },
-      categories: function (q) { return list("/categories", q); },
+      categories: function (params) { return page("/categories", params); },
       saveCategory: function (item) {
         return item._id ? $http.put(base + "/categories/" + item._id, item) : $http.post(base + "/categories", item);
       },
       deleteCategory: function (id) { return $http.delete(base + "/categories/" + id); },
-      links: function (q) { return list("/audio-links", q); },
+      links: function (params) { return page("/audio-links", params); },
       saveLink: function (item) {
         return item._id ? $http.put(base + "/audio-links/" + item._id, item) : $http.post(base + "/audio-links", item);
       },
       deleteLink: function (id) { return $http.delete(base + "/audio-links/" + id); },
-      users: function (q) { return list("/users", q); },
+      users: function (params) { return page("/users", params); },
       saveUser: function (item) {
         return item.id ? $http.put(base + "/users/" + item.id, item) : $http.post(base + "/users", item);
       },
@@ -129,7 +177,6 @@
     };
   });
 
-  // Keep datetime-local as YYYY-MM-DDTHH:mm strings so the browser does not reject Date/ISO values.
   app.directive("localDatetime", function () {
     return {
       restrict: "A",
@@ -145,8 +192,8 @@
     };
   });
 
-  app.controller("ShellCtrl", ["$scope", "$rootScope", "$location", "AuthService", "Api",
-    function ($scope, $rootScope, $location, AuthService, Api) {
+  app.controller("ShellCtrl", ["$scope", "$rootScope", "$location", "AuthService", "Api", "CatalogStore",
+    function ($scope, $rootScope, $location, AuthService, Api, CatalogStore) {
       $scope.auth = { username: "", password: "", error: "", loading: false };
       $scope.sidebarOpen = false;
       $scope.profile = AuthService.profile();
@@ -191,6 +238,7 @@
 
       $scope.logout = function () {
         AuthService.clear();
+        CatalogStore.clear();
         $scope.isAuthed = false;
         $scope.profile = null;
       };
@@ -207,33 +255,6 @@
         }).catch(function () { $scope.logout(); });
       }
     }]);
-
-  function bindList($scope, Api, loader) {
-    $scope.query = "";
-    $scope.refreshing = false;
-    $scope.formError = "";
-    $scope.search = function () { loader(); };
-    $scope.refresh = function () {
-      $scope.refreshing = true;
-      Api.reload().then(function (res) {
-        $scope.cacheMeta = res.data;
-        loader();
-      }).finally(function () { $scope.refreshing = false; });
-    };
-    $scope.closeForm = function () {
-      $scope.form = null;
-      $scope.formError = "";
-    };
-    function onEscape(event) {
-      if (event.keyCode === 27 && $scope.form) {
-        $scope.$apply($scope.closeForm);
-      }
-    }
-    angular.element(document).on("keydown", onEscape);
-    $scope.$on("$destroy", function () {
-      angular.element(document).off("keydown", onEscape);
-    });
-  }
 
   function flashError($scope, err, fallback) {
     var message = (err && err.data && (err.data.message || err.data.error)) || fallback;
@@ -256,282 +277,457 @@
     return isNaN(date.getTime()) ? null : date.toISOString();
   }
 
-  app.controller("DashboardCtrl", ["$scope", "Api", function ($scope, Api) {
-    $scope.stats = {};
-    function load() {
-      Api.stats().then(function (res) { $scope.stats = res.data; });
+  function bindPaged($scope, $rootScope, CatalogStore, options) {
+    $scope.query = "";
+    $scope.page = 0;
+    $scope.size = PAGE_SIZE;
+    $scope.total = 0;
+    $scope.totalPages = 1;
+    $scope.pageStart = 0;
+    $scope.pageEnd = 0;
+    $scope.items = [];
+    $scope.pageLoading = false;
+    $scope.refreshing = false;
+    $scope.form = null;
+    $scope.formError = "";
+    $scope.saving = false;
+
+    function viewKey() {
+      return options.key + ":" + ($scope.filter || "") + ":" + ($scope.stationFilter || "") + ":"
+        + ($scope.query || "") + ":" + $scope.page + ":" + $scope.size;
     }
+
+    function apply(data) {
+      $scope.items = (data && data.items) || [];
+      $scope.total = (data && data.total) || 0;
+      $scope.page = data && typeof data.page === "number" ? data.page : $scope.page;
+      $scope.size = (data && data.size) || $scope.size;
+      $scope.totalPages = (data && data.totalPages) || 1;
+      $scope.pageStart = $scope.total ? ($scope.page * $scope.size) + 1 : 0;
+      $scope.pageEnd = Math.min(($scope.page + 1) * $scope.size, $scope.total);
+      CatalogStore.set(viewKey(), {
+        items: $scope.items,
+        total: $scope.total,
+        page: $scope.page,
+        size: $scope.size,
+        totalPages: $scope.totalPages
+      });
+    }
+
+    $scope.load = function (opts) {
+      opts = opts || {};
+      var cached = CatalogStore.get(viewKey());
+      var showedBusy = false;
+      if (cached && cached.items && cached.items.length) {
+        apply(cached);
+      } else if (!opts.silent) {
+        $scope.pageLoading = !$scope.items.length;
+        if (!$scope.items.length) {
+          $rootScope.showBusy(options.loadingMessage || "Loading...");
+          showedBusy = true;
+        }
+      }
+      return options.fetch({
+        q: $scope.query,
+        page: $scope.page,
+        size: $scope.size,
+        status: $scope.filter,
+        stationId: $scope.stationFilter
+      }).then(function (res) {
+        apply(res.data);
+      }).catch(function (err) {
+        flashError($scope, err, "Could not load data.");
+      }).finally(function () {
+        $scope.pageLoading = false;
+        if (showedBusy) { $rootScope.hideBusy(); }
+      });
+    };
+
+    $scope.search = function () {
+      $scope.page = 0;
+      $scope.load();
+    };
+    $scope.prevPage = function () {
+      if ($scope.page > 0) {
+        $scope.page -= 1;
+        $scope.load();
+      }
+    };
+    $scope.nextPage = function () {
+      if ($scope.page < $scope.totalPages - 1) {
+        $scope.page += 1;
+        $scope.load();
+      }
+    };
+    $scope.changeSize = function () {
+      $scope.page = 0;
+      $scope.load();
+    };
     $scope.refresh = function () {
-      Api.reload().then(function () {
-        $scope.$root.flash = { text: "Catalog reloaded from MongoDB into cache." };
-        load();
+      $scope.refreshing = true;
+      $rootScope.showBusy("Refreshing from database...");
+      CatalogStore.clear();
+      options.reload().then(function () {
+        return $scope.load({ silent: true });
+      }).then(function () {
+        $rootScope.flash = { text: "Catalog reloaded from MongoDB into cache." };
+      }).finally(function () {
+        $scope.refreshing = false;
+        $rootScope.hideBusy();
       });
     };
-    load();
-  }]);
-
-  app.controller("EventsCtrl", ["$scope", "Api", function ($scope, Api) {
-    $scope.filter = "pending";
-    $scope.events = [];
-    $scope.form = null;
-    bindList($scope, Api, load);
-    function load() {
-      Api.events($scope.query).then(function (res) { $scope.events = res.data || []; });
+    $scope.closeForm = function () {
+      if ($scope.saving) { return; }
+      $scope.form = null;
+      $scope.formError = "";
+    };
+    function onEscape(event) {
+      if (event.keyCode === 27 && $scope.form && !$scope.saving) {
+        $scope.$apply($scope.closeForm);
+      }
     }
-    $scope.filtered = function () {
-      return ($scope.events || []).filter(function (event) {
-        var status = (event.approvalStatus || "approved").toLowerCase();
-        return $scope.filter === "all" || status === $scope.filter;
+    angular.element(document).on("keydown", onEscape);
+    $scope.$on("$destroy", function () {
+      angular.element(document).off("keydown", onEscape);
+    });
+  }
+
+  function runAction($scope, $rootScope, message, work, successText) {
+    $scope.saving = true;
+    $rootScope.showBusy(message);
+    return work().then(function () {
+      $scope.saving = false;
+      $scope.closeForm();
+      return $scope.load({ silent: true });
+    }).then(function () {
+      $rootScope.flash = { text: successText };
+    }).catch(function (err) {
+      flashError($scope, err, "The request failed.");
+    }).finally(function () {
+      $scope.saving = false;
+      $rootScope.hideBusy();
+    });
+  }
+
+  function loadLookups($scope, Api, CatalogStore) {
+    var cachedStations = CatalogStore.get("lookup:stations");
+    var cachedCategories = CatalogStore.get("lookup:categories");
+    if (cachedStations && cachedStations.items) { $scope.lookupStations = cachedStations.items; }
+    if (cachedCategories && cachedCategories.items) { $scope.lookupCategories = cachedCategories.items; }
+    Api.stations({ page: 0, size: 100 }).then(function (res) {
+      $scope.lookupStations = res.data.items || [];
+      CatalogStore.set("lookup:stations", res.data);
+    }).catch(function () {});
+    Api.categories({ page: 0, size: 100 }).then(function (res) {
+      $scope.lookupCategories = res.data.items || [];
+      CatalogStore.set("lookup:categories", res.data);
+    }).catch(function () {});
+  }
+
+  app.controller("DashboardCtrl", ["$scope", "$rootScope", "Api", "CatalogStore",
+    function ($scope, $rootScope, Api, CatalogStore) {
+      $scope.stats = CatalogStore.get("stats") || {};
+      function load(forceBusy) {
+        var showed = false;
+        if (forceBusy || !$scope.stats.cacheSource) {
+          $rootScope.showBusy("Loading dashboard...");
+          showed = true;
+        }
+        return Api.stats().then(function (res) {
+          $scope.stats = res.data;
+          CatalogStore.set("stats", res.data);
+        }).finally(function () {
+          if (showed) { $rootScope.hideBusy(); }
+        });
+      }
+      $scope.refresh = function () {
+        $rootScope.showBusy("Refreshing from database...");
+        CatalogStore.clear();
+        $scope.stats = {};
+        Api.reload().then(function () {
+          return load(false);
+        }).then(function () {
+          $rootScope.flash = { text: "Catalog reloaded from MongoDB into cache." };
+        }).finally(function () { $rootScope.hideBusy(); });
+      };
+      load(false);
+    }]);
+
+  app.controller("EventsCtrl", ["$scope", "$rootScope", "$timeout", "Api", "CatalogStore",
+    function ($scope, $rootScope, $timeout, Api, CatalogStore) {
+      $scope.filter = "pending";
+      bindPaged($scope, $rootScope, CatalogStore, {
+        key: "events",
+        loadingMessage: "Loading events...",
+        fetch: function (params) { return Api.events(params); },
+        reload: function () { return Api.reload(); }
       });
-    };
-    $scope.openCreate = function () {
-      $scope.formError = "";
-      var start = toDatetimeLocal(new Date());
-      $scope.form = {
-        title: "", city: "", address: "", organizedBy: "", organization: "", category: "",
-        description: "", status: "scheduled", approvalStatus: "approved",
-        date: start, end_date: start
+      $scope.setFilter = function (value) {
+        $scope.filter = value;
+        $scope.page = 0;
+        $scope.load();
       };
-    };
-    $scope.openEdit = function (event) {
-      $scope.formError = "";
-      $scope.form = angular.copy(event);
-      $scope.form.date = toDatetimeLocal(event.date);
-      $scope.form.end_date = toDatetimeLocal(event.end_date || event.endDate || event.date);
-    };
-    $scope.save = function () {
-      if (!$scope.form.title || !$scope.form.city || !$scope.form.date) {
-        $scope.formError = "Please fill Title, City, and Start date.";
-        return;
-      }
-      var payload = angular.copy($scope.form);
-      delete payload.$$hashKey;
-      payload.date = fromDatetimeLocal(payload.date);
-      payload.end_date = fromDatetimeLocal(payload.end_date) || payload.date;
-      Api.saveEvent(payload).then(function () {
-        $scope.closeForm();
-        load();
-        $scope.$root.flash = { text: "Event saved." };
-      }).catch(function (err) { flashError($scope, err, "Could not save event."); });
-    };
-    $scope.remove = function (event) {
-      if (window.confirm("Delete this event?")) {
-        Api.deleteEvent(event._id).then(load).catch(function (err) {
-          flashError($scope, err, "Could not delete event.");
-        });
-      }
-    };
-    $scope.approve = function (event) { Api.approve(event._id, event.reviewNote).then(load); };
-    $scope.reject = function (event) {
-      var note = window.prompt("Rejection note (optional)", event.reviewNote || "");
-      if (note !== null) { Api.reject(event._id, note).then(load); }
-    };
-    load();
-  }]);
-
-  app.controller("StationsCtrl", ["$scope", "Api", function ($scope, Api) {
-    $scope.stations = [];
-    $scope.categories = [];
-    $scope.form = null;
-    bindList($scope, Api, load);
-    function load() {
-      Api.stations($scope.query).then(function (res) { $scope.stations = res.data || []; });
-      Api.categories().then(function (res) { $scope.categories = res.data || []; });
-    }
-    $scope.openCreate = function () {
-      $scope.formError = "";
-      $scope.form = { live: true, play_mode: "sequence", type: "radio", language: "en", nameEn: "", nameHi: "", category: "" };
-    };
-    $scope.openEdit = function (station) {
-      $scope.formError = "";
-      $scope.form = angular.copy(station);
-      $scope.form.nameEn = (station.translations && station.translations.en && station.translations.en.name) || "";
-      $scope.form.nameHi = (station.translations && station.translations.hi && station.translations.hi.name) || "";
-      $scope.form.play_mode = station.play_mode || station.playMode || "sequence";
-    };
-    $scope.save = function () {
-      if (!$scope.form.nameEn) {
-        $scope.formError = "Please enter the English name.";
-        return;
-      }
-      var payload = angular.copy($scope.form);
-      payload.translations = { en: { name: payload.nameEn || "" }, hi: { name: payload.nameHi || payload.nameEn || "" } };
-      delete payload.nameEn;
-      delete payload.nameHi;
-      Api.saveStation(payload).then(function () {
-        $scope.closeForm();
-        load();
-        $scope.$root.flash = { text: "Station saved." };
-      }).catch(function (err) { flashError($scope, err, "Could not save station."); });
-    };
-    $scope.remove = function (station) {
-      if (window.confirm("Delete this station and its audio links?")) {
-        Api.deleteStation(station._id).then(load).catch(function (err) {
-          flashError($scope, err, "Could not delete station.");
-        });
-      }
-    };
-    load();
-  }]);
-
-  app.controller("CategoriesCtrl", ["$scope", "Api", function ($scope, Api) {
-    $scope.categories = [];
-    $scope.form = null;
-    bindList($scope, Api, load);
-    function load() {
-      Api.categories($scope.query).then(function (res) { $scope.categories = res.data || []; });
-    }
-    $scope.openCreate = function () {
-      $scope.formError = "";
-      $scope.form = { order: 1, icon: "music_note", nameEn: "", nameHi: "", category: "" };
-    };
-    $scope.openEdit = function (category) {
-      $scope.formError = "";
-      $scope.form = angular.copy(category);
-      $scope.form.nameEn = (category.translations && category.translations.en && category.translations.en.name) || "";
-      $scope.form.nameHi = (category.translations && category.translations.hi && category.translations.hi.name) || "";
-    };
-    $scope.save = function () {
-      if (!$scope.form.category || !$scope.form.nameEn) {
-        $scope.formError = "Please fill Key and English name.";
-        return;
-      }
-      var payload = angular.copy($scope.form);
-      payload.translations = {
-        en: { name: payload.nameEn || payload.category },
-        hi: { name: payload.nameHi || payload.nameEn || payload.category }
+      $scope.openCreate = function () {
+        $scope.formError = "";
+        var start = toDatetimeLocal(new Date());
+        $scope.form = {
+          title: "", city: "", address: "", organizedBy: "", organization: "", category: "",
+          description: "", status: "scheduled", approvalStatus: "approved",
+          date: start, end_date: start
+        };
       };
-      delete payload.nameEn;
-      delete payload.nameHi;
-      Api.saveCategory(payload).then(function () {
-        $scope.closeForm();
-        load();
-        $scope.$root.flash = { text: "Category saved." };
-      }).catch(function (err) { flashError($scope, err, "Could not save category."); });
-    };
-    $scope.remove = function (category) {
-      if (window.confirm("Delete this category?")) {
-        Api.deleteCategory(category._id).then(load).catch(function (err) {
-          flashError($scope, err, "Could not delete category.");
-        });
-      }
-    };
-    load();
-  }]);
-
-  app.controller("LinksCtrl", ["$scope", "Api", function ($scope, Api) {
-    $scope.links = [];
-    $scope.stations = [];
-    $scope.stationFilter = "";
-    $scope.form = null;
-    bindList($scope, Api, load);
-    function load() {
-      Api.links($scope.query).then(function (res) { $scope.links = res.data || []; });
-      Api.stations().then(function (res) { $scope.stations = res.data || []; });
-    }
-    $scope.filtered = function () {
-      if (!$scope.stationFilter) { return $scope.links; }
-      return ($scope.links || []).filter(function (link) { return link.station_id === $scope.stationFilter; });
-    };
-    $scope.openCreate = function () {
-      $scope.formError = "";
-      $scope.form = { played: false, status: "N", sequence: 1, nameEn: "", station_id: $scope.stationFilter || "" };
-    };
-    $scope.openEdit = function (link) {
-      $scope.formError = "";
-      $scope.form = angular.copy(link);
-      $scope.form.nameEn = (link.translations && link.translations.en && link.translations.en.name) || "";
-      $scope.form.station_id = link.station_id || link.stationId;
-    };
-    $scope.save = function () {
-      if (!$scope.form.nameEn || !$scope.form.url || !$scope.form.station_id) {
-        $scope.formError = "Please fill Title, Station, and URL.";
-        return;
-      }
-      var payload = angular.copy($scope.form);
-      payload.translations = { en: { name: payload.nameEn || "Track" } };
-      delete payload.nameEn;
-      Api.saveLink(payload).then(function () {
-        $scope.closeForm();
-        load();
-        $scope.$root.flash = { text: "Audio link saved." };
-      }).catch(function (err) { flashError($scope, err, "Could not save audio link."); });
-    };
-    $scope.remove = function (link) {
-      if (window.confirm("Delete this audio link?")) {
-        Api.deleteLink(link._id).then(load).catch(function (err) {
-          flashError($scope, err, "Could not delete audio link.");
-        });
-      }
-    };
-    load();
-  }]);
-
-  app.controller("UsersCtrl", ["$scope", "Api", function ($scope, Api) {
-    $scope.users = [];
-    $scope.categories = [];
-    $scope.form = null;
-    $scope.modules = [
-      { key: "events", label: "Events", approve: true },
-      { key: "stations", label: "Stations" },
-      { key: "categories", label: "Categories" },
-      { key: "audioLinks", label: "Audio links" },
-      { key: "users", label: "Sub-admins" }
-    ];
-    bindList($scope, Api, load);
-    function load() {
-      Api.users($scope.query).then(function (res) { $scope.users = res.data || []; });
-      Api.categories().then(function (res) { $scope.categories = res.data || []; }).catch(function () {});
-    }
-    $scope.openCreate = function () {
-      $scope.formError = "";
-      $scope.form = {
-        username: "", password: "", displayName: "", organization: "",
-        role: "SUB_ADMIN", enabled: true, ownRecordsOnly: false,
-        permissions: emptyPermissions(), allowedCategoryKeys: [], allowedOrganizationsText: ""
+      $scope.openEdit = function (event) {
+        $rootScope.showBusy("Opening event...");
+        $timeout(function () {
+          $scope.formError = "";
+          $scope.form = angular.copy(event);
+          $scope.form.date = toDatetimeLocal(event.date);
+          $scope.form.end_date = toDatetimeLocal(event.end_date || event.endDate || event.date);
+          $rootScope.hideBusy();
+        }, 0);
       };
-    };
-    $scope.openEdit = function (user) {
-      $scope.formError = "";
-      $scope.form = angular.copy(user);
-      $scope.form.password = "";
-      $scope.form.permissions = angular.merge(emptyPermissions(), user.permissions || {});
-      $scope.form.allowedOrganizationsText = (user.allowedOrganizations || []).join(", ");
-      $scope.form.role = user.superAdmin ? "SUPER_ADMIN" : "SUB_ADMIN";
-    };
-    $scope.toggleCategory = function (key) {
-      $scope.form.allowedCategoryKeys = $scope.form.allowedCategoryKeys || [];
-      var idx = $scope.form.allowedCategoryKeys.indexOf(key);
-      if (idx >= 0) { $scope.form.allowedCategoryKeys.splice(idx, 1); }
-      else { $scope.form.allowedCategoryKeys.push(key); }
-    };
-    $scope.hasCategory = function (key) {
-      return $scope.form && ($scope.form.allowedCategoryKeys || []).indexOf(key) >= 0;
-    };
-    $scope.save = function () {
-      if (!$scope.form.username || (!$scope.form.id && (!$scope.form.password || $scope.form.password.length < 8))) {
-        $scope.formError = "Username is required. New users need a password of at least 8 characters.";
-        return;
-      }
-      var payload = angular.copy($scope.form);
-      payload.allowedOrganizations = (payload.allowedOrganizationsText || "")
-        .split(",").map(function (s) { return s.trim(); }).filter(Boolean);
-      delete payload.allowedOrganizationsText;
-      delete payload.superAdmin;
-      if (!payload.password) { delete payload.password; }
-      Api.saveUser(payload).then(function () {
-        $scope.closeForm();
-        load();
-        $scope.$root.flash = { text: "User saved." };
-      }).catch(function (err) { flashError($scope, err, "Could not save user."); });
-    };
-    $scope.remove = function (user) {
-      if (window.confirm("Delete sub-admin " + user.username + "?")) {
-        Api.deleteUser(user.id).then(load).catch(function (err) {
-          flashError($scope, err, "Could not delete user.");
-        });
-      }
-    };
-    load();
-  }]);
+      $scope.save = function () {
+        if (!$scope.form.title || !$scope.form.city || !$scope.form.date) {
+          $scope.formError = "Please fill Title, City, and Start date.";
+          return;
+        }
+        var payload = angular.copy($scope.form);
+        delete payload.$$hashKey;
+        payload.date = fromDatetimeLocal(payload.date);
+        payload.end_date = fromDatetimeLocal(payload.end_date) || payload.date;
+        runAction($scope, $rootScope, "Saving event...", function () {
+          return Api.saveEvent(payload);
+        }, "Event saved.");
+      };
+      $scope.remove = function (event) {
+        if (!window.confirm("Delete this event?")) { return; }
+        runAction($scope, $rootScope, "Deleting event...", function () {
+          return Api.deleteEvent(event._id);
+        }, "Event deleted.");
+      };
+      $scope.approve = function (event) {
+        runAction($scope, $rootScope, "Approving event...", function () {
+          return Api.approve(event._id, event.reviewNote);
+        }, "Event approved.");
+      };
+      $scope.reject = function (event) {
+        var note = window.prompt("Rejection note (optional)", event.reviewNote || "");
+        if (note === null) { return; }
+        runAction($scope, $rootScope, "Rejecting event...", function () {
+          return Api.reject(event._id, note);
+        }, "Event rejected.");
+      };
+      $scope.load();
+    }]);
+
+  app.controller("StationsCtrl", ["$scope", "$rootScope", "$timeout", "Api", "CatalogStore",
+    function ($scope, $rootScope, $timeout, Api, CatalogStore) {
+      bindPaged($scope, $rootScope, CatalogStore, {
+        key: "stations",
+        loadingMessage: "Loading stations...",
+        fetch: function (params) { return Api.stations(params); },
+        reload: function () { return Api.reload(); }
+      });
+      loadLookups($scope, Api, CatalogStore);
+      $scope.openCreate = function () {
+        $scope.formError = "";
+        $scope.form = { live: true, play_mode: "sequence", type: "radio", language: "en", nameEn: "", nameHi: "", category: "" };
+      };
+      $scope.openEdit = function (station) {
+        $rootScope.showBusy("Opening station...");
+        $timeout(function () {
+          $scope.formError = "";
+          $scope.form = angular.copy(station);
+          $scope.form.nameEn = (station.translations && station.translations.en && station.translations.en.name) || "";
+          $scope.form.nameHi = (station.translations && station.translations.hi && station.translations.hi.name) || "";
+          $scope.form.play_mode = station.play_mode || station.playMode || "sequence";
+          $rootScope.hideBusy();
+        }, 0);
+      };
+      $scope.save = function () {
+        if (!$scope.form.nameEn) {
+          $scope.formError = "Please enter the English name.";
+          return;
+        }
+        var payload = angular.copy($scope.form);
+        payload.translations = { en: { name: payload.nameEn || "" }, hi: { name: payload.nameHi || payload.nameEn || "" } };
+        delete payload.nameEn;
+        delete payload.nameHi;
+        runAction($scope, $rootScope, "Saving station...", function () {
+          return Api.saveStation(payload);
+        }, "Station saved.");
+      };
+      $scope.remove = function (station) {
+        if (!window.confirm("Delete this station and its audio links?")) { return; }
+        runAction($scope, $rootScope, "Deleting station...", function () {
+          return Api.deleteStation(station._id);
+        }, "Station deleted.");
+      };
+      $scope.load();
+    }]);
+
+  app.controller("CategoriesCtrl", ["$scope", "$rootScope", "$timeout", "Api", "CatalogStore",
+    function ($scope, $rootScope, $timeout, Api, CatalogStore) {
+      bindPaged($scope, $rootScope, CatalogStore, {
+        key: "categories",
+        loadingMessage: "Loading categories...",
+        fetch: function (params) { return Api.categories(params); },
+        reload: function () { return Api.reload(); }
+      });
+      $scope.openCreate = function () {
+        $scope.formError = "";
+        $scope.form = { order: 1, icon: "music_note", nameEn: "", nameHi: "", category: "" };
+      };
+      $scope.openEdit = function (category) {
+        $rootScope.showBusy("Opening category...");
+        $timeout(function () {
+          $scope.formError = "";
+          $scope.form = angular.copy(category);
+          $scope.form.nameEn = (category.translations && category.translations.en && category.translations.en.name) || "";
+          $scope.form.nameHi = (category.translations && category.translations.hi && category.translations.hi.name) || "";
+          $rootScope.hideBusy();
+        }, 0);
+      };
+      $scope.save = function () {
+        if (!$scope.form.category || !$scope.form.nameEn) {
+          $scope.formError = "Please fill Key and English name.";
+          return;
+        }
+        var payload = angular.copy($scope.form);
+        payload.translations = {
+          en: { name: payload.nameEn || payload.category },
+          hi: { name: payload.nameHi || payload.nameEn || payload.category }
+        };
+        delete payload.nameEn;
+        delete payload.nameHi;
+        runAction($scope, $rootScope, "Saving category...", function () {
+          return Api.saveCategory(payload);
+        }, "Category saved.");
+      };
+      $scope.remove = function (category) {
+        if (!window.confirm("Delete this category?")) { return; }
+        runAction($scope, $rootScope, "Deleting category...", function () {
+          return Api.deleteCategory(category._id);
+        }, "Category deleted.");
+      };
+      $scope.load();
+    }]);
+
+  app.controller("LinksCtrl", ["$scope", "$rootScope", "$timeout", "Api", "CatalogStore",
+    function ($scope, $rootScope, $timeout, Api, CatalogStore) {
+      $scope.stationFilter = "";
+      bindPaged($scope, $rootScope, CatalogStore, {
+        key: "links",
+        loadingMessage: "Loading audio links...",
+        fetch: function (params) { return Api.links(params); },
+        reload: function () { return Api.reload(); }
+      });
+      loadLookups($scope, Api, CatalogStore);
+      $scope.setStationFilter = function () {
+        $scope.page = 0;
+        $scope.load();
+      };
+      $scope.openCreate = function () {
+        $scope.formError = "";
+        $scope.form = { played: false, status: "N", sequence: 1, nameEn: "", station_id: $scope.stationFilter || "" };
+      };
+      $scope.openEdit = function (link) {
+        $rootScope.showBusy("Opening audio link...");
+        $timeout(function () {
+          $scope.formError = "";
+          $scope.form = angular.copy(link);
+          $scope.form.nameEn = (link.translations && link.translations.en && link.translations.en.name) || "";
+          $scope.form.station_id = link.station_id || link.stationId;
+          $rootScope.hideBusy();
+        }, 0);
+      };
+      $scope.save = function () {
+        if (!$scope.form.nameEn || !$scope.form.url || !$scope.form.station_id) {
+          $scope.formError = "Please fill Title, Station, and URL.";
+          return;
+        }
+        var payload = angular.copy($scope.form);
+        payload.translations = { en: { name: payload.nameEn || "Track" } };
+        delete payload.nameEn;
+        runAction($scope, $rootScope, "Saving audio link...", function () {
+          return Api.saveLink(payload);
+        }, "Audio link saved.");
+      };
+      $scope.remove = function (link) {
+        if (!window.confirm("Delete this audio link?")) { return; }
+        runAction($scope, $rootScope, "Deleting audio link...", function () {
+          return Api.deleteLink(link._id);
+        }, "Audio link deleted.");
+      };
+      $scope.load();
+    }]);
+
+  app.controller("UsersCtrl", ["$scope", "$rootScope", "$timeout", "Api", "CatalogStore",
+    function ($scope, $rootScope, $timeout, Api, CatalogStore) {
+      $scope.modules = [
+        { key: "events", label: "Events", approve: true },
+        { key: "stations", label: "Stations" },
+        { key: "categories", label: "Categories" },
+        { key: "audioLinks", label: "Audio links" },
+        { key: "users", label: "Sub-admins" }
+      ];
+      bindPaged($scope, $rootScope, CatalogStore, {
+        key: "users",
+        loadingMessage: "Loading users...",
+        fetch: function (params) { return Api.users(params); },
+        reload: function () { return Api.reload(); }
+      });
+      loadLookups($scope, Api, CatalogStore);
+      $scope.openCreate = function () {
+        $scope.formError = "";
+        $scope.form = {
+          username: "", password: "", displayName: "", organization: "",
+          role: "SUB_ADMIN", enabled: true, ownRecordsOnly: false,
+          permissions: emptyPermissions(), allowedCategoryKeys: [], allowedOrganizationsText: ""
+        };
+      };
+      $scope.openEdit = function (user) {
+        $rootScope.showBusy("Opening user...");
+        $timeout(function () {
+          $scope.formError = "";
+          $scope.form = angular.copy(user);
+          $scope.form.password = "";
+          $scope.form.permissions = angular.merge(emptyPermissions(), user.permissions || {});
+          $scope.form.allowedOrganizationsText = (user.allowedOrganizations || []).join(", ");
+          $scope.form.role = user.superAdmin ? "SUPER_ADMIN" : "SUB_ADMIN";
+          $rootScope.hideBusy();
+        }, 0);
+      };
+      $scope.toggleCategory = function (key) {
+        $scope.form.allowedCategoryKeys = $scope.form.allowedCategoryKeys || [];
+        var idx = $scope.form.allowedCategoryKeys.indexOf(key);
+        if (idx >= 0) { $scope.form.allowedCategoryKeys.splice(idx, 1); }
+        else { $scope.form.allowedCategoryKeys.push(key); }
+      };
+      $scope.hasCategory = function (key) {
+        return $scope.form && ($scope.form.allowedCategoryKeys || []).indexOf(key) >= 0;
+      };
+      $scope.save = function () {
+        if (!$scope.form.username || (!$scope.form.id && (!$scope.form.password || $scope.form.password.length < 8))) {
+          $scope.formError = "Username is required. New users need a password of at least 8 characters.";
+          return;
+        }
+        var payload = angular.copy($scope.form);
+        payload.allowedOrganizations = (payload.allowedOrganizationsText || "")
+          .split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+        delete payload.allowedOrganizationsText;
+        delete payload.superAdmin;
+        if (!payload.password) { delete payload.password; }
+        runAction($scope, $rootScope, "Saving user...", function () {
+          return Api.saveUser(payload);
+        }, "User saved.");
+      };
+      $scope.remove = function (user) {
+        if (!window.confirm("Delete sub-admin " + user.username + "?")) { return; }
+        runAction($scope, $rootScope, "Deleting user...", function () {
+          return Api.deleteUser(user.id);
+        }, "User deleted.");
+      };
+      $scope.load();
+    }]);
 })();
