@@ -10,8 +10,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -34,16 +32,16 @@ class EventSubmissionServiceTest {
     @Mock
     private AdminCatalogService catalogService;
     @Mock
-    private ObjectProvider<JavaMailSender> mailSender;
+    private CredentialService credentialService;
 
     private EventSubmissionService service;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
     @BeforeEach
     void setUp() {
-        when(mailSender.getIfAvailable()).thenReturn(null);
+        when(credentialService.mailSender()).thenReturn(java.util.Optional.empty());
         service = new EventSubmissionService(
-                repository, catalogService, encoder, mailSender, "", true);
+                repository, catalogService, encoder, credentialService, true);
         when(repository.save(any(EventSubmissionDocument.class))).thenAnswer(invocation -> {
             EventSubmissionDocument doc = invocation.getArgument(0);
             if (doc.getId() == null) {

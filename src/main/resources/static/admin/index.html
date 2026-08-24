@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/admin/css/admin.css?v=20260824d">
+  <link rel="stylesheet" href="/admin/css/admin.css?v=20260824e">
 </head>
 <body>
   <div id="admin-boot" style="min-height:100vh;display:grid;place-items:center;background:#eef2f7;color:#5b6b7c;font-family:sans-serif">Loading admin console...</div>
@@ -19,11 +19,11 @@
       <div class="alert" ng-show="auth.error" ng-bind="auth.error"></div>
       <label class="field">
         <span>Username</span>
-        <input type="text" ng-model="auth.username" autocomplete="username" required>
+        <input type="text" ng-model="auth.username" autocomplete="username" required placeholder="e.g. admin">
       </label>
       <label class="field">
         <span>Password</span>
-        <input type="password" ng-model="auth.password" autocomplete="current-password" required>
+        <input type="password" ng-model="auth.password" autocomplete="current-password" required placeholder="e.g. your admin password">
       </label>
       <button class="btn btn-primary" type="submit" ng-disabled="auth.loading">
         <span ng-hide="auth.loading">Sign in</span>
@@ -48,6 +48,7 @@
       <a class="nav-link" href="#/categories" ng-if="can('categories','read')" ng-class="{active: isActive('/categories')}" ng-click="closeSidebar()">Categories</a>
       <a class="nav-link" href="#/links" ng-if="can('audioLinks','read')" ng-class="{active: isActive('/links')}" ng-click="closeSidebar()">Audio links</a>
       <a class="nav-link" href="#/users" ng-if="can('users','read')" ng-class="{active: isActive('/users')}" ng-click="closeSidebar()">Sub-admins</a>
+      <a class="nav-link" href="#/settings" ng-if="profile.superAdmin" ng-class="{active: isActive('/settings')}" ng-click="closeSidebar()">Settings</a>
     </aside>
     <section class="main">
       <header class="topbar">
@@ -60,12 +61,6 @@
       </header>
       <div class="flash" ng-class="{error: $root.flash.error}" ng-if="$root.flash" ng-click="clearFlash()">{{$root.flash.text}}</div>
       <div class="page" ng-view></div>
-      <div class="busy-overlay" ng-if="busy">
-        <div class="busy-card">
-          <div class="spinner"></div>
-          <p>{{busy}}</p>
-        </div>
-      </div>
     </section>
   </div>
 
@@ -89,7 +84,11 @@
       </div>
       <button class="btn btn-info btn-sm" ng-click="refresh()">Refresh from database</button>
     </div>
-    <div class="stats">
+    <div class="table-loader" ng-if="pageLoading && !stats.cacheSource">
+      <div class="spinner"></div>
+      <p>Loading dashboard...</p>
+    </div>
+    <div class="stats" ng-if="!pageLoading || stats.cacheSource">
       <div class="stat-card"><span>Pending events</span><strong>{{stats.pendingEvents || 0}}</strong></div>
       <div class="stat-card"><span>Approved events</span><strong>{{stats.approvedEvents || 0}}</strong></div>
       <div class="stat-card"><span>Stations</span><strong>{{stats.stations || 0}}</strong></div>
@@ -115,8 +114,8 @@
       <button class="btn btn-info btn-sm icon-btn" title="Refresh from database" ng-click="refresh()" ng-disabled="refreshing">↻</button>
     </div>
     <div class="filters">
-      <button class="chip" ng-class="{active: filter==='pending'}" ng-click="setFilter('pending')">Pending</button>
       <button class="chip" ng-class="{active: filter==='approved'}" ng-click="setFilter('approved')">Approved</button>
+      <button class="chip" ng-class="{active: filter==='pending'}" ng-click="setFilter('pending')">Pending</button>
       <button class="chip" ng-class="{active: filter==='rejected'}" ng-click="setFilter('rejected')">Rejected</button>
       <button class="chip" ng-class="{active: filter==='all'}" ng-click="setFilter('all')">All</button>
     </div>
@@ -132,7 +131,7 @@
             <th>When</th>
             <th>Submitter</th>
             <th>Status</th>
-            <th></th>
+            <th class="col-actions"></th>
           </tr>
         </thead>
         <tbody>
@@ -175,16 +174,16 @@
         </div>
         <div class="form-error" ng-if="formError">{{formError}}</div>
         <div class="grid-2">
-          <label class="field"><span>Title</span><input ng-model="form.title"></label>
-          <label class="field"><span>City</span><input ng-model="form.city"></label>
+          <label class="field"><span>Title</span><input ng-model="form.title" placeholder="e.g. Sunday Evening Kirtan"></label>
+          <label class="field"><span>City</span><input ng-model="form.city" placeholder="e.g. Amritsar"></label>
           <label class="field"><span>Start Date</span><input type="datetime-local" local-datetime ng-model="form.date"></label>
           <label class="field"><span>End Date</span><input type="datetime-local" local-datetime ng-model="form.end_date"></label>
-          <label class="field"><span>Venue</span><input ng-model="form.address"></label>
-          <label class="field"><span>Organized By</span><input ng-model="form.organizedBy"></label>
+          <label class="field"><span>Venue</span><input ng-model="form.address" placeholder="e.g. Gurdwara Sahib Hall"></label>
+          <label class="field"><span>Organized By</span><input ng-model="form.organizedBy" placeholder="e.g. Divine Bliss Sangat"></label>
           <label class="field"><span>Organization</span><input ng-model="form.organization" placeholder="e.g. dodra"></label>
-          <label class="field"><span>Category</span><input ng-model="form.category" placeholder="Optional"></label>
-          <label class="field"><span>Latitude</span><input type="number" step="any" ng-model="form.latitude"></label>
-          <label class="field"><span>Longitude</span><input type="number" step="any" ng-model="form.longitude"></label>
+          <label class="field"><span>Category</span><input ng-model="form.category" placeholder="e.g. live_kirtan"></label>
+          <label class="field"><span>Latitude</span><input type="number" step="any" ng-model="form.latitude" placeholder="e.g. 31.6200"></label>
+          <label class="field"><span>Longitude</span><input type="number" step="any" ng-model="form.longitude" placeholder="e.g. 74.8765"></label>
           <label class="field">
             <span>Approval</span>
             <select ng-model="form.approvalStatus">
@@ -201,8 +200,8 @@
             </select>
           </label>
         </div>
-        <label class="field"><span>Description</span><textarea ng-model="form.description"></textarea></label>
-        <label class="field"><span>Review Note</span><input ng-model="form.reviewNote"></label>
+        <label class="field"><span>Description</span><textarea ng-model="form.description" placeholder="e.g. Weekly kirtan followed by langar for the sangat"></textarea></label>
+        <label class="field"><span>Review Note</span><input ng-model="form.reviewNote" placeholder="e.g. Approved after checking the venue details"></label>
         <div class="modal-actions">
           <button class="btn btn-ghost btn-sm" type="button" ng-click="closeForm()" ng-disabled="saving">Cancel</button>
           <button class="btn btn-primary btn-sm" type="submit" ng-disabled="saving">
@@ -233,12 +232,13 @@
         <p>Loading stations...</p>
       </div>
       <table ng-if="items.length">
-        <thead><tr><th>Name</th><th>Category</th><th>Language</th><th>Live</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>Category</th><th>Language</th><th>Type</th><th>Live</th><th class="col-actions"></th></tr></thead>
         <tbody>
           <tr ng-repeat="station in items track by station._id">
             <td><strong>{{station | stationName}}</strong></td>
             <td>{{station.category}}</td>
-            <td>{{station.language}}</td>
+            <td>{{station.language | languageName}}</td>
+            <td>{{station.type | stationTypeName}}</td>
             <td>{{station.live ? 'Yes' : 'No'}}</td>
             <td class="row-actions">
               <button class="btn btn-ghost btn-sm" ng-if="can('stations','update')" ng-click="openEdit(station)" ng-disabled="saving">Edit</button>
@@ -258,15 +258,19 @@
         </div>
         <div class="form-error" ng-if="formError">{{formError}}</div>
         <div class="grid-2">
-          <label class="field"><span>English Name</span><input ng-model="form.nameEn"></label>
-          <label class="field"><span>Hindi Name</span><input ng-model="form.nameHi"></label>
+          <label class="field"><span>English Name</span><input ng-model="form.nameEn" placeholder="e.g. Live Kirtan Radio"></label>
+          <label class="field"><span>Hindi Name</span><input ng-model="form.nameHi" placeholder="e.g. लाइव कीर्तन रेडियो"></label>
           <label class="field">
             <span>Category</span>
             <select ng-model="form.category" ng-options="cat.category as (cat | categoryName) for cat in lookupCategories">
               <option value="">Select Category</option>
             </select>
           </label>
-          <label class="field"><span>Language</span><input ng-model="form.language"></label>
+          <label class="field">
+            <span>Language</span>
+            <select ng-model="form.language" ng-options="lang.code as lang.name for lang in languages">
+            </select>
+          </label>
           <label class="field">
             <span>Play Mode</span>
             <select ng-model="form.play_mode">
@@ -274,8 +278,12 @@
               <option value="shuffle">Shuffle</option>
             </select>
           </label>
-          <label class="field"><span>Type</span><input ng-model="form.type"></label>
-          <label class="field"><span>Thumbnail URL</span><input ng-model="form.thumbnail"></label>
+          <label class="field">
+            <span>Type</span>
+            <select ng-model="form.type" ng-options="type.code as type.name for type in stationTypes">
+            </select>
+          </label>
+          <label class="field"><span>Thumbnail URL</span><input ng-model="form.thumbnail" placeholder="e.g. https://example.com/station-cover.jpg"></label>
           <label class="check-pill" style="align-self:end;margin-bottom:14px"><input type="checkbox" ng-model="form.live"> Live Station</label>
         </div>
         <div class="modal-actions">
@@ -308,11 +316,13 @@
         <p>Loading categories...</p>
       </div>
       <table ng-if="items.length">
-        <thead><tr><th>Key</th><th>Name</th><th>Order</th><th></th></tr></thead>
+        <thead><tr><th>Key</th><th>English</th><th>Punjabi</th><th>Icon</th><th>Order</th><th class="col-actions"></th></tr></thead>
         <tbody>
           <tr ng-repeat="category in items track by category._id">
             <td>{{category.category}}</td>
             <td>{{(category.translations && category.translations.en && category.translations.en.name) || category.category}}</td>
+            <td>{{(category.translations && category.translations.pa && category.translations.pa.name) || '—'}}</td>
+            <td>{{category.icon}}</td>
             <td>{{category.order}}</td>
             <td class="row-actions">
               <button class="btn btn-ghost btn-sm" ng-if="can('categories','update')" ng-click="openEdit(category)" ng-disabled="saving">Edit</button>
@@ -332,11 +342,16 @@
         </div>
         <div class="form-error" ng-if="formError">{{formError}}</div>
         <div class="grid-2">
-          <label class="field"><span>Key</span><input ng-model="form.category"></label>
-          <label class="field"><span>Order</span><input type="number" ng-model="form.order"></label>
-          <label class="field"><span>English Name</span><input ng-model="form.nameEn"></label>
-          <label class="field"><span>Hindi Name</span><input ng-model="form.nameHi"></label>
-          <label class="field"><span>Icon</span><input ng-model="form.icon"></label>
+          <label class="field"><span>Key</span><input ng-model="form.category" placeholder="e.g. live_kirtan"></label>
+          <label class="field"><span>Order</span><input type="number" ng-model="form.order" placeholder="e.g. 1"></label>
+          <label class="field"><span>English Name</span><input ng-model="form.nameEn" placeholder="e.g. Live Kirtan"></label>
+          <label class="field"><span>Hindi Name</span><input ng-model="form.nameHi" placeholder="e.g. लाइव कीर्तन"></label>
+          <label class="field"><span>Punjabi Name</span><input ng-model="form.namePa" placeholder="e.g. ਲਾਈਵ ਕੀਰਤਨ"></label>
+          <label class="field">
+            <span>Icon</span>
+            <select ng-model="form.icon" ng-options="icon.value as icon.label for icon in iconOptions">
+            </select>
+          </label>
         </div>
         <div class="modal-actions">
           <button class="btn btn-ghost btn-sm" type="button" ng-click="closeForm()" ng-disabled="saving">Cancel</button>
@@ -373,13 +388,13 @@
         <p>Loading audio links...</p>
       </div>
       <table ng-if="items.length">
-        <thead><tr><th>Title</th><th>Station</th><th>Sequence</th><th>URL</th><th></th></tr></thead>
+        <thead><tr><th>Title</th><th>Station</th><th>Sequence</th><th>URL</th><th class="col-actions"></th></tr></thead>
         <tbody>
           <tr ng-repeat="link in items track by link._id">
             <td>{{(link.translations && link.translations.en && link.translations.en.name) || 'Track'}}</td>
-            <td>{{link.station_id}}</td>
+            <td>{{stationLabel(link.station_id || link.stationId)}}</td>
             <td>{{link.sequence}}</td>
-            <td class="muted">{{link.url}}</td>
+            <td class="url-cell" title="{{link.url}}">{{link.url}}</td>
             <td class="row-actions">
               <button class="btn btn-ghost btn-sm" ng-if="can('audioLinks','update')" ng-click="openEdit(link)" ng-disabled="saving">Edit</button>
               <button class="btn btn-danger btn-sm" ng-if="can('audioLinks','delete')" ng-click="remove(link)" ng-disabled="saving">Delete</button>
@@ -398,15 +413,15 @@
         </div>
         <div class="form-error" ng-if="formError">{{formError}}</div>
         <div class="grid-2">
-          <label class="field"><span>Title</span><input ng-model="form.nameEn"></label>
+          <label class="field"><span>Title</span><input ng-model="form.nameEn" placeholder="e.g. Rehraas Sahib"></label>
           <label class="field">
             <span>Station</span>
             <select ng-model="form.station_id" ng-options="station._id as (station | stationName) for station in lookupStations">
               <option value="">Select Station</option>
             </select>
           </label>
-          <label class="field"><span>Sequence</span><input type="number" ng-model="form.sequence"></label>
-          <label class="field"><span>URL</span><input ng-model="form.url"></label>
+          <label class="field"><span>Sequence</span><input type="number" ng-model="form.sequence" placeholder="e.g. 1"></label>
+          <label class="field"><span>URL</span><input ng-model="form.url" placeholder="e.g. https://example.com/rehraas.mp3"></label>
         </div>
         <div class="modal-actions">
           <button class="btn btn-ghost btn-sm" type="button" ng-click="closeForm()" ng-disabled="saving">Cancel</button>
@@ -438,7 +453,7 @@
         <p>Loading users...</p>
       </div>
       <table ng-if="items.length">
-        <thead><tr><th>User</th><th>Role</th><th>Organization</th><th>Access</th><th></th></tr></thead>
+        <thead><tr><th>User</th><th>Role</th><th>Organization</th><th>Access</th><th class="col-actions"></th></tr></thead>
         <tbody>
           <tr ng-repeat="user in items track by user.id">
             <td>
@@ -471,9 +486,9 @@
         </div>
         <div class="form-error" ng-if="formError">{{formError}}</div>
         <div class="grid-2">
-          <label class="field"><span>Username</span><input ng-model="form.username" ng-disabled="!!form.id"></label>
-          <label class="field"><span>Password</span><input type="password" ng-model="form.password" placeholder="{{form.id ? 'Leave blank to keep' : 'Min 8 characters'}}"></label>
-          <label class="field"><span>Display Name</span><input ng-model="form.displayName"></label>
+          <label class="field"><span>Username</span><input ng-model="form.username" ng-disabled="!!form.id" placeholder="e.g. harpreet.admin"></label>
+          <label class="field"><span>Password</span><input type="password" ng-model="form.password" placeholder="{{form.id ? 'Leave blank to keep current password' : 'e.g. Sangat@2026'}}"></label>
+          <label class="field"><span>Display Name</span><input ng-model="form.displayName" placeholder="e.g. Harpreet Singh"></label>
           <label class="field"><span>Home Organization</span><input ng-model="form.organization" placeholder="e.g. dodra"></label>
         </div>
         <label class="field">
@@ -507,7 +522,7 @@
           </div>
           <label class="field">
             <span>Allowed Organizations (Comma Separated)</span>
-            <input ng-model="form.allowedOrganizationsText" placeholder="dodra, amritsar">
+            <input ng-model="form.allowedOrganizationsText" placeholder="e.g. dodra, amritsar">
           </label>
           <div class="field">
             <span>Allowed Categories (Stations And Links Follow These)</span>
@@ -524,6 +539,38 @@
           <button class="btn btn-ghost btn-sm" type="button" ng-click="closeForm()" ng-disabled="saving">Cancel</button>
           <button class="btn btn-primary btn-sm" type="submit" ng-disabled="saving">
             <span ng-hide="saving">Save</span>
+            <span ng-show="saving">Saving...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </script>
+
+  <script type="text/ng-template" id="settings.html">
+    <div class="page-head">
+      <div>
+        <h1>Settings</h1>
+        <div class="muted">Gmail and Backblaze credentials are stored in MongoDB. Passwords are encrypted at rest.</div>
+      </div>
+    </div>
+    <div class="table-loader" ng-if="pageLoading">
+      <div class="spinner"></div>
+      <p>Loading credentials...</p>
+    </div>
+    <div class="form-error" ng-if="formError">{{formError}}</div>
+    <div class="panel" ng-repeat="item in items">
+      <h3>{{item.type}}</h3>
+      <form novalidate ng-submit="save(item)">
+        <div class="grid-2">
+          <label class="field" ng-repeat="(key, value) in item.fields">
+            <span>{{fieldLabel(key)}}</span>
+            <input ng-if="!isSecret(key)" ng-model="item.fields[key]" placeholder="{{fieldPlaceholder(item.type, key)}}">
+            <input ng-if="isSecret(key)" type="password" ng-model="item.fields[key]" placeholder="Leave blank to keep the saved password">
+          </label>
+        </div>
+        <div class="modal-actions" style="justify-content:flex-start">
+          <button class="btn btn-primary btn-sm" type="submit" ng-disabled="saving">
+            <span ng-hide="saving">Save {{item.type}}</span>
             <span ng-show="saving">Saving...</span>
           </button>
         </div>
@@ -560,7 +607,7 @@
           "https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.8.3/angular-route.min.js"
         ]);
       }).then(function () {
-        return loadScript("/admin/js/app.js?v=20260824d");
+        return loadScript("/admin/js/app.js?v=20260824e");
       }).then(function () {
         var boot = document.getElementById("admin-boot");
         if (boot) { boot.remove(); }

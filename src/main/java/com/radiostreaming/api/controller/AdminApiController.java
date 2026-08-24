@@ -10,10 +10,12 @@ import com.radiostreaming.api.model.EventDocument;
 import com.radiostreaming.api.model.StationDocument;
 import com.radiostreaming.api.service.AdminCatalogService;
 import com.radiostreaming.api.service.AdminUserService;
+import com.radiostreaming.api.service.CredentialService;
 import com.radiostreaming.api.service.CurrentAdmin;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -24,14 +26,17 @@ public class AdminApiController {
 
     private final AdminCatalogService adminCatalogService;
     private final AdminUserService adminUserService;
+    private final CredentialService credentialService;
     private final CurrentAdmin currentAdmin;
 
     public AdminApiController(
             AdminCatalogService adminCatalogService,
             AdminUserService adminUserService,
+            CredentialService credentialService,
             CurrentAdmin currentAdmin) {
         this.adminCatalogService = adminCatalogService;
         this.adminUserService = adminUserService;
+        this.credentialService = credentialService;
         this.currentAdmin = currentAdmin;
     }
 
@@ -199,5 +204,31 @@ public class AdminApiController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteUser(@PathVariable String id) {
         adminUserService.delete(currentAdmin.require(), id);
+    }
+
+    @GetMapping("/credentials")
+    public List<Map<String, Object>> listCredentials() {
+        requireSuperAdmin();
+        return credentialService.listMasked();
+    }
+
+    @GetMapping("/credentials/{type}")
+    public Map<String, Object> getCredential(@PathVariable String type) {
+        requireSuperAdmin();
+        return credentialService.getMasked(type);
+    }
+
+    @PutMapping("/credentials/{type}")
+    public Map<String, Object> saveCredential(
+            @PathVariable String type,
+            @RequestBody Map<String, String> fields) {
+        requireSuperAdmin();
+        return credentialService.saveMasked(type, fields);
+    }
+
+    private void requireSuperAdmin() {
+        if (!currentAdmin.require().isSuperAdmin()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only a super admin can manage credentials");
+        }
     }
 }

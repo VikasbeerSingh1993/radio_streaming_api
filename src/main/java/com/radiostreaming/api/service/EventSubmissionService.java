@@ -8,7 +8,6 @@ import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -37,8 +36,7 @@ public class EventSubmissionService {
     private final EventSubmissionRepository submissionRepository;
     private final AdminCatalogService adminCatalogService;
     private final PasswordEncoder passwordEncoder;
-    private final ObjectProvider<JavaMailSender> mailSender;
-    private final String mailFrom;
+    private final CredentialService credentialService;
     private final boolean logOtp;
     private final SecureRandom random = new SecureRandom();
 
@@ -46,14 +44,12 @@ public class EventSubmissionService {
             EventSubmissionRepository submissionRepository,
             AdminCatalogService adminCatalogService,
             PasswordEncoder passwordEncoder,
-            ObjectProvider<JavaMailSender> mailSender,
-            @Value("${app.mail.from:}") String mailFrom,
+            CredentialService credentialService,
             @Value("${app.mail.log-otp:false}") boolean logOtp) {
         this.submissionRepository = submissionRepository;
         this.adminCatalogService = adminCatalogService;
         this.passwordEncoder = passwordEncoder;
-        this.mailSender = mailSender;
-        this.mailFrom = mailFrom;
+        this.credentialService = credentialService;
         this.logOtp = logOtp;
     }
 
@@ -132,19 +128,22 @@ public class EventSubmissionService {
     }
 
     private void deliverOtp(String email, String username, String otp) {
-        JavaMailSender sender = mailSender.getIfAvailable();
+        JavaMailSender sender = credentialService.mailSender().orElse(null);
         if (sender == null) {
             if (logOtp) {
-                log.info("MAIL_HOST is not set; logging event OTP for {} ({}): {}", username, email, otp);
+                log.info("GMAIL credentials are not in the database; logging event OTP for {} ({}): {}", username, email, otp);
                 return;
             }
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "Email delivery is not configured. Set MAIL_HOST, MAIL_USERNAME, MAIL_PASSWORD, and MAIL_FROM.");
+                    "Email delivery is not configured. Add GMAIL host, port, username, and password in admin Settings.");
         }
         try {
             MimeMessage message = sender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
-            String from = mailFrom == null || mailFrom.isBlank() ? "noreply@localhost" : mailFrom;
+            String from = credentialService.mailFrom();
+            if (from == null || from.isBlank()) {
+                from = "noreply@localhost";
+            }
             helper.setFrom(new InternetAddress(from));
             helper.setTo(email);
             helper.setSubject("Your event verification code");

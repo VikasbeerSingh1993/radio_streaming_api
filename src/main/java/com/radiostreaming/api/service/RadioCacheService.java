@@ -158,18 +158,24 @@ public class RadioCacheService {
     }
 
     public void upsertEvent(EventDocument event) {
+        ensureLoaded();
         mutate(current -> replaceOrAdd(current.events, event, EventDocument::getId));
+        log.info("Second-level cache refreshed after event save");
     }
 
     public void removeEvent(String id) {
+        ensureLoaded();
         mutate(current -> current.events.removeIf(item -> sameId(item.getId(), id)));
+        log.info("Second-level cache refreshed after event delete");
     }
 
     public void upsertStation(StationDocument station) {
+        ensureLoaded();
         mutate(current -> replaceOrAdd(current.stations, station, StationDocument::getId));
     }
 
     public void removeStation(String id) {
+        ensureLoaded();
         mutate(current -> {
             current.stations.removeIf(item -> sameId(item.getId(), id));
             current.audioLinksByStation.remove(RadioDataService.cleanId(id));
@@ -177,14 +183,17 @@ public class RadioCacheService {
     }
 
     public void upsertCategory(CategoryDocument category) {
+        ensureLoaded();
         mutate(current -> replaceOrAdd(current.categories, category, CategoryDocument::getId));
     }
 
     public void removeCategory(String id) {
+        ensureLoaded();
         mutate(current -> current.categories.removeIf(item -> sameId(item.getId(), id)));
     }
 
     public void upsertAudioLink(AudioLinkDocument link) {
+        ensureLoaded();
         mutate(current -> {
             if (link == null || link.getId() == null) {
                 return;
@@ -198,6 +207,7 @@ public class RadioCacheService {
     }
 
     public void removeAudioLink(String id) {
+        ensureLoaded();
         mutate(current -> removeLink(current, id));
     }
 

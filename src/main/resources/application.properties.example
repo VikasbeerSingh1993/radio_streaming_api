@@ -12,4 +12,6 @@ app.admin.password=${ADMIN_PASSWORD:admin}
 app.admin.reset-password=${ADMIN_RESET_PASSWORD:false}
 app.jwt.secret=${JWT_SECRET:change-this-jwt-secret}
 app.jwt.expiration-ms=28800000
+app.credentials.encrypt-key=${CREDENTIALS_ENCRYPT_KEY:change-this-credential-key}
+app.mail.log-otp=${MAIL_LOG_OTP:false}
 
