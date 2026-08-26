@@ -1,5 +1,6 @@
 package com.radiostreaming.api.service;
 
+import com.radiostreaming.api.credentials.CentralCredentialCatalog;
 import com.radiostreaming.api.dto.LoginRequest;
 import com.radiostreaming.api.dto.LoginResponse;
 import com.radiostreaming.api.model.AdminPermissions;
@@ -8,7 +9,6 @@ import com.radiostreaming.api.repository.AdminUserRepository;
 import com.radiostreaming.api.security.JwtService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
@@ -19,6 +19,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 
+/**
+ * Admin auth. Super-admin is seeded once from {@link CentralCredentialCatalog} into Mongo {@code admins}.
+ * Password is never read from Railway env vars.
+ */
 @Service
 public class AdminAuthService {
 
@@ -28,46 +32,34 @@ public class AdminAuthService {
     private final AdminDirectory adminDirectory;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-    private final String bootstrapUsername;
-    private final String bootstrapPassword;
-    private final boolean resetPassword;
 
     public AdminAuthService(
             AdminUserRepository adminUserRepository,
             AdminDirectory adminDirectory,
             PasswordEncoder passwordEncoder,
-            JwtService jwtService,
-            @Value("${app.admin.username:admin}") String bootstrapUsername,
-            @Value("${app.admin.password:Admin@12345}") String bootstrapPassword,
-            @Value("${app.admin.reset-password:false}") boolean resetPassword) {
+            JwtService jwtService) {
         this.adminUserRepository = adminUserRepository;
         this.adminDirectory = adminDirectory;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
-        this.bootstrapUsername = bootstrapUsername;
-        this.bootstrapPassword = bootstrapPassword;
-        this.resetPassword = resetPassword;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     @Order(10)
     public void seedAdminUser() {
-        adminUserRepository.findByUsername(bootstrapUsername).ifPresentOrElse(existing -> {
+        String username = CentralCredentialCatalog.ADMIN_USERNAME;
+        adminUserRepository.findByUsername(username).ifPresentOrElse(existing -> {
             existing.setRole("SUPER_ADMIN");
             existing.setEnabled(true);
             existing.setOwnRecordsOnly(false);
             existing.setPermissions(AdminPermissions.fullAccess());
-            if (resetPassword) {
-                existing.setPasswordHash(passwordEncoder.encode(bootstrapPassword));
-                log.info("Reset password for super admin '{}'", bootstrapUsername);
-            }
             adminDirectory.put(adminUserRepository.save(existing));
-            log.info("Ensured super admin '{}' has full access", bootstrapUsername);
+            log.info("Ensured super admin '{}' has full access (password unchanged; managed in Mongo)", username);
         }, () -> {
             AdminUser admin = new AdminUser();
-            admin.setUsername(bootstrapUsername);
+            admin.setUsername(username);
             admin.setDisplayName("Super Admin");
-            admin.setPasswordHash(passwordEncoder.encode(bootstrapPassword));
+            admin.setPasswordHash(passwordEncoder.encode(CentralCredentialCatalog.ADMIN_PASSWORD));
             admin.setRole("SUPER_ADMIN");
             admin.setEnabled(true);
             admin.setOwnRecordsOnly(false);
@@ -76,7 +68,7 @@ public class AdminAuthService {
             admin.setCreatedBy("system");
             AdminUser saved = adminUserRepository.save(admin);
             adminDirectory.put(saved);
-            log.info("Seeded super admin '{}' in collection 'admins'", bootstrapUsername);
+            log.info("Seeded super admin '{}' from central catalog (change password after first login)", username);
         });
     }
 

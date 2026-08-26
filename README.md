@@ -108,14 +108,14 @@ Submit body (ISO-8601 dates):
 
 Open **http://localhost:8080/admin/** locally, or the live URL above.
 
-Bootstrap login (change in production):
+Bootstrap login (first seed only; then change in Admin → users):
 
-| | Default | Environment variable |
-|---|---|---|
-| Username | `admin` | `ADMIN_USERNAME` |
-| Password | `admin` | `ADMIN_PASSWORD` |
+| | Seeded once from code catalog |
+|---|---|
+| Username | `admin` |
+| Password | see `CentralCredentialCatalog` (change after first login) |
 
-Credentials live in MongoDB `admins`. Passwords are hashed. Set `ADMIN_RESET_PASSWORD=true` for one deploy if you need to reset the seeded password from env vars, then turn it off.
+Credentials live in MongoDB `admins` (hashed). Connection secrets (Gmail, MySQL, B2, GEO, Mongo) live in Mongo `app_credentials`, seeded from the central code catalog — not from Railway.
 
 ### Screens
 
@@ -190,21 +190,15 @@ Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/admin/login -Conte
 
 ## Environment variables
 
-| Variable | Required | Default | Purpose |
-|----------|----------|---------|---------|
-| `MONGODB_URI` | Yes (prod) | placeholder URI | MongoDB Atlas connection string |
-| `PORT` | Railway sets this | `8080` | HTTP port |
-| `ADMIN_USERNAME` | No | `admin` | Seeded super-admin username |
-| `ADMIN_PASSWORD` | No | `admin` | Seeded super-admin password |
-| `ADMIN_RESET_PASSWORD` | No | `false` | Set `true` once to reset the seed password |
-| `JWT_SECRET` | Yes (prod) | dev placeholder | Must be a long random string in production |
-| `MAIL_HOST` | Yes (prod) | unset | SMTP host, e.g. `smtp.gmail.com` |
-| `MAIL_PORT` | No | `587` | SMTP port |
-| `MAIL_USERNAME` | Yes (prod) | unset | SMTP username |
-| `MAIL_PASSWORD` | Yes (prod) | unset | SMTP password or app password |
-| `MAIL_FROM` | No | `MAIL_USERNAME` | From address on OTP emails |
-| `MAIL_LOG_OTP` | No | `false` | Set `true` only in local dev to log OTPs when mail is unset |
-| `app.cache.ttl` | No | `24h` | How long the in-memory snapshot is considered fresh |
+Do **not** store MySQL, Gmail, B2, or admin passwords on Railway. Those are seeded from `CentralCredentialCatalog` into Mongo `app_credentials` / `admins` at startup.
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `MONGODB_URI` | Yes (prod) | Bootstrap only — open Mongo so `app_credentials` can be read |
+| `PORT` | Railway sets this | HTTP port |
+| `JWT_SECRET` | Optional | Process JWT signing (has code default; prefer a long random value) |
+| `CREDENTIALS_ENCRYPT_KEY` | Optional | Encrypts secrets in `app_credentials` (defaults to JWT secret) |
+| `MAIL_LOG_OTP` | No | Dev-only: log OTPs when Gmail row is missing |
 
 Do not commit real Mongo URIs or production passwords.
 
@@ -238,23 +232,17 @@ This repo is wired for Railway:
 ### First-time setup
 
 1. Create a Railway project from this GitHub repo (`radio_streaming_api`).
-2. Set variables:
+2. Set variables (secrets stay in Mongo / code catalog — not Railway):
 
    | Variable | Value |
    |----------|--------|
-   | `MONGODB_URI` | MongoDB Atlas connection string |
-   | `ADMIN_USERNAME` | Super-admin username |
-   | `ADMIN_PASSWORD` | Super-admin password |
-   | `JWT_SECRET` | Long random string |
-   | `MAIL_HOST` | SMTP host (`smtp.gmail.com`) |
-   | `MAIL_PORT` | `587` |
-   | `MAIL_USERNAME` | SMTP username |
-   | `MAIL_PASSWORD` | SMTP password or Gmail app password |
-   | `MAIL_FROM` | From address for OTP emails |
-   | `ADMIN_RESET_PASSWORD` | `true` only when you need to reset the seed user |
+   | `MONGODB_URI` | MongoDB Atlas connection string (bootstrap only) |
+   | `JWT_SECRET` | Optional long random string for JWT / encrypt key |
 
 3. In **Settings → Networking**, generate a public domain.
 4. Enable GitHub auto-deploy on the `main` branch.
+
+Manage Gmail / MySQL / B2 / GEO in Admin → Settings (`app_credentials`).
 
 Later pushes to `main` rebuild and redeploy automatically.
 
