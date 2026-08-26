@@ -28,6 +28,7 @@ public class CreditMeteringService {
 
     public static final String OP_OCR = "OCR_PUNJABI";
     public static final String OP_AI_IMAGE = "AI_IMAGE";
+    public static final String OP_SIKH_HISTORY = "SIKH_HISTORY";
 
     private final SaasUserRepository userRepository;
     private final SaasApiKeyRepository apiKeyRepository;
@@ -77,7 +78,11 @@ public class CreditMeteringService {
         int totalCost = Math.max(1, units) * unitCost;
         boolean overage = false;
         if (user.getCreditsRemaining() < totalCost) {
-            boolean allow = OP_OCR.equals(operation) ? user.isAllowOcrOverage() : user.isAllowAiImageOverage();
+            boolean allow = switch (operation) {
+                case OP_OCR -> user.isAllowOcrOverage();
+                case OP_AI_IMAGE -> user.isAllowAiImageOverage();
+                default -> false;
+            };
             if (!allow) {
                 throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED,
                         "Insufficient credits. Remaining: " + user.getCreditsRemaining()
@@ -136,10 +141,20 @@ public class CreditMeteringService {
         if (user.getPlanId() != null) {
             SaasPlanDocument plan = planRepository.findById(user.getPlanId()).orElse(null);
             if (plan != null) {
-                return OP_OCR.equals(operation) ? plan.getCreditCostOcr() : plan.getCreditCostAiImage();
+                return switch (operation) {
+                    case OP_OCR -> plan.getCreditCostOcr() > 0 ? plan.getCreditCostOcr() : 5;
+                    case OP_AI_IMAGE -> plan.getCreditCostAiImage() > 0 ? plan.getCreditCostAiImage() : 10;
+                    case OP_SIKH_HISTORY -> plan.getCreditCostSikhHistory() > 0 ? plan.getCreditCostSikhHistory() : 2;
+                    default -> 5;
+                };
             }
         }
-        return OP_OCR.equals(operation) ? 5 : 10;
+        return switch (operation) {
+            case OP_OCR -> 5;
+            case OP_AI_IMAGE -> 10;
+            case OP_SIKH_HISTORY -> 2;
+            default -> 5;
+        };
     }
 
     public static String hashKey(String raw) {

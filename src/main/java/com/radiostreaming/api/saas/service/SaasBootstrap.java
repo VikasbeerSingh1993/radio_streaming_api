@@ -13,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -36,15 +37,38 @@ public class SaasBootstrap {
     @EventListener(ApplicationReadyEvent.class)
     @Order(20)
     public void seedPlansAndAdmin() {
+        Instant now = Instant.now();
         if (planRepository.count() == 0) {
-            Instant now = Instant.now();
-            planRepository.save(plan("starter", "Starter", "Try Punjabi OCR & AI images", 900, 200, 5, 10,
-                    List.of("200 credits", "Punjabi OCR", "AI image generation", "API key access"), 1, now));
-            planRepository.save(plan("growth", "Growth", "For small teams and apps", 2900, 1000, 4, 8,
-                    List.of("1,000 credits", "Lower per-call cost", "Overage option", "Email support"), 2, now));
-            planRepository.save(plan("scale", "Scale", "High volume SaaS usage", 9900, 5000, 3, 6,
-                    List.of("5,000 credits", "Best unit rates", "Priority support", "Usage analytics"), 3, now));
+            planRepository.save(plan("starter", "Starter", "Try Punjabi OCR & AI images", 900, 200, 5, 10, 2,
+                    defaultFeatures(200), 1, now));
+            planRepository.save(plan("growth", "Growth", "For small teams and apps", 2900, 1000, 4, 8, 2,
+                    defaultFeatures(1000), 2, now));
+            planRepository.save(plan("scale", "Scale", "High volume SaaS usage", 9900, 5000, 3, 6, 1,
+                    defaultFeatures(5000), 3, now));
             log.info("Seeded default SaaS plans in Mongo collection saas_plans");
+        } else {
+            // Keep existing prices/credits; ensure Sikh History is listed and costed.
+            for (SaasPlanDocument existing : planRepository.findAll()) {
+                boolean changed = false;
+                if (existing.getCreditCostSikhHistory() <= 0) {
+                    int cost = "scale".equalsIgnoreCase(existing.getCode()) ? 1 : 2;
+                    existing.setCreditCostSikhHistory(cost);
+                    changed = true;
+                }
+                List<String> features = existing.getFeatures() == null
+                        ? new ArrayList<>()
+                        : new ArrayList<>(existing.getFeatures());
+                if (features.stream().noneMatch(f -> f.toLowerCase().contains("sikh history"))) {
+                    features.add("AI Sikh History search");
+                    existing.setFeatures(features);
+                    changed = true;
+                }
+                if (changed) {
+                    existing.setUpdatedAt(now);
+                    planRepository.save(existing);
+                }
+            }
+            log.info("Ensured SaaS plans include AI Sikh History search");
         }
 
         userRepository.findByEmailIgnoreCase("saas-admin@divinebliss.app").ifPresentOrElse(existing -> {
@@ -53,7 +77,6 @@ public class SaasBootstrap {
                 userRepository.save(existing);
             }
         }, () -> {
-            Instant now = Instant.now();
             SaasUserDocument admin = new SaasUserDocument();
             admin.setEmail("saas-admin@divinebliss.app");
             admin.setDisplayName("SaaS Admin");
@@ -69,6 +92,15 @@ public class SaasBootstrap {
         });
     }
 
+    private static List<String> defaultFeatures(long credits) {
+        return List.of(
+                credits + " credits",
+                "Punjabi OCR",
+                "AI image generation",
+                "AI Sikh History search",
+                "API key access");
+    }
+
     private static SaasPlanDocument plan(
             String code,
             String name,
@@ -77,6 +109,7 @@ public class SaasBootstrap {
             long credits,
             int ocrCost,
             int imageCost,
+            int sikhHistoryCost,
             List<String> features,
             int sort,
             Instant now) {
@@ -88,6 +121,7 @@ public class SaasBootstrap {
         p.setCreditsIncluded(credits);
         p.setCreditCostOcr(ocrCost);
         p.setCreditCostAiImage(imageCost);
+        p.setCreditCostSikhHistory(sikhHistoryCost);
         p.setFeatures(features);
         p.setActive(true);
         p.setSortOrder(sort);

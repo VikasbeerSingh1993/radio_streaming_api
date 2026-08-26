@@ -34,6 +34,9 @@ public class SaasPlanDocument {
     @Field("credit_cost_ai_image")
     private int creditCostAiImage = 10;
 
+    @Field("credit_cost_sikh_history")
+    private int creditCostSikhHistory = 2;
+
     private List<String> features = new ArrayList<>();
 
     private boolean active = true;
@@ -105,6 +108,14 @@ public class SaasPlanDocument {
 
     public void setCreditCostAiImage(int creditCostAiImage) {
         this.creditCostAiImage = creditCostAiImage;
+    }
+
+    public int getCreditCostSikhHistory() {
+        return creditCostSikhHistory;
+    }
+
+    public void setCreditCostSikhHistory(int creditCostSikhHistory) {
+        this.creditCostSikhHistory = creditCostSikhHistory;
     }
 
     public List<String> getFeatures() {

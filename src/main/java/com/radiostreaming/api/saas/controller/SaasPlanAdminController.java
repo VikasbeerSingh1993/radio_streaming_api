@@ -80,6 +80,9 @@ public class SaasPlanAdminController {
         if (incoming.getCreditCostAiImage() > 0) {
             plan.setCreditCostAiImage(incoming.getCreditCostAiImage());
         }
+        if (incoming.getCreditCostSikhHistory() > 0) {
+            plan.setCreditCostSikhHistory(incoming.getCreditCostSikhHistory());
+        }
         if (incoming.getFeatures() != null) {
             plan.setFeatures(incoming.getFeatures());
         }

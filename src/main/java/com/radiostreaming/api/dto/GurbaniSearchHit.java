@@ -11,7 +11,11 @@ public class GurbaniSearchHit {
     private String gurmukhi;
     private String unicode;
     private String transliteration;
+    /** Preferred English translation (legacy field). */
     private String translation;
+    private String translationEnglish;
+    private String translationPunjabi;
+    private String translationHindi;
     private String writer;
     private String raag;
     private Double score;
@@ -95,6 +99,30 @@ public class GurbaniSearchHit {
 
     public void setTranslation(String translation) {
         this.translation = translation;
+    }
+
+    public String getTranslationEnglish() {
+        return translationEnglish;
+    }
+
+    public void setTranslationEnglish(String translationEnglish) {
+        this.translationEnglish = translationEnglish;
+    }
+
+    public String getTranslationPunjabi() {
+        return translationPunjabi;
+    }
+
+    public void setTranslationPunjabi(String translationPunjabi) {
+        this.translationPunjabi = translationPunjabi;
+    }
+
+    public String getTranslationHindi() {
+        return translationHindi;
+    }
+
+    public void setTranslationHindi(String translationHindi) {
+        this.translationHindi = translationHindi;
     }
 
     public String getWriter() {

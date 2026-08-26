@@ -125,6 +125,7 @@ public class GurbaniSearchService {
                     """
                     SELECT verse_id, source_code, shabad_id, page_no, line_no, ang,
                            gurmukhi, unicode, translit_english, english_bdb, english_ms, english_ssk,
+                           punjabi_ss, punjabi_bdb, punjabi_ft, hindi_ss, hindi_sts,
                            writer_english, raag_english
                     FROM search_documents
                     WHERE source_code = ? AND (ang = ? OR page_no = ?)
@@ -161,6 +162,7 @@ public class GurbaniSearchService {
                     """
                     SELECT verse_id, source_code, shabad_id, page_no, line_no, ang,
                            gurmukhi, unicode, translit_english, english_bdb, english_ms, english_ssk,
+                           punjabi_ss, punjabi_bdb, punjabi_ft, hindi_ss, hindi_sts,
                            writer_english, raag_english
                     FROM search_documents
                     WHERE shabad_id = ?
@@ -205,6 +207,7 @@ public class GurbaniSearchService {
                 """
                 SELECT verse_id, source_code, shabad_id, page_no, line_no, ang,
                        gurmukhi, unicode, translit_english, english_bdb, english_ms, english_ssk,
+                       punjabi_ss, punjabi_bdb, punjabi_ft, hindi_ss, hindi_sts,
                        writer_english, raag_english,
                        MATCH(search_blob) AGAINST (? IN NATURAL LANGUAGE MODE) AS score
                 FROM search_documents
@@ -258,6 +261,7 @@ public class GurbaniSearchService {
                 """
                 SELECT verse_id, source_code, shabad_id, page_no, line_no, ang,
                        gurmukhi, unicode, translit_english, english_bdb, english_ms, english_ssk,
+                       punjabi_ss, punjabi_bdb, punjabi_ft, hindi_ss, hindi_sts,
                        writer_english, raag_english, NULL AS score
                 FROM search_documents
                 """ + where + """
@@ -337,11 +341,21 @@ public class GurbaniSearchService {
         hit.setGurmukhi(rs.getString("gurmukhi"));
         hit.setUnicode(rs.getString("unicode"));
         hit.setTransliteration(rs.getString("translit_english"));
-        String translation = firstNonBlank(
+        String english = firstNonBlank(
                 rs.getString("english_bdb"),
                 rs.getString("english_ms"),
                 rs.getString("english_ssk"));
-        hit.setTranslation(translation);
+        String punjabi = firstNonBlank(
+                rs.getString("punjabi_ss"),
+                rs.getString("punjabi_bdb"),
+                rs.getString("punjabi_ft"));
+        String hindi = firstNonBlank(
+                rs.getString("hindi_ss"),
+                rs.getString("hindi_sts"));
+        hit.setTranslationEnglish(english);
+        hit.setTranslationPunjabi(punjabi);
+        hit.setTranslationHindi(hindi);
+        hit.setTranslation(english);
         hit.setWriter(rs.getString("writer_english"));
         hit.setRaag(rs.getString("raag_english"));
         try {

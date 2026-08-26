@@ -1,7 +1,10 @@
 package com.radiostreaming.api.aiimages;
 
+import com.radiostreaming.api.saas.security.CurrentSaasUser;
+import com.radiostreaming.api.saas.security.SaasPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -13,14 +16,18 @@ import java.util.Map;
 public class SikhHistoryChatController {
 
     private final SikhHistoryChatService chatService;
+    private final CurrentSaasUser currentSaasUser;
 
-    public SikhHistoryChatController(SikhHistoryChatService chatService) {
+    public SikhHistoryChatController(SikhHistoryChatService chatService, CurrentSaasUser currentSaasUser) {
         this.chatService = chatService;
+        this.currentSaasUser = currentSaasUser;
     }
 
     @PostMapping("/chat")
     @SuppressWarnings("unchecked")
-    public Map<String, Object> chat(@RequestBody(required = false) Map<String, Object> body) {
+    public Map<String, Object> chat(
+            @RequestHeader(value = "X-API-Key", required = false) String apiKey,
+            @RequestBody(required = false) Map<String, Object> body) {
         String message = "";
         List<Map<String, String>> history = null;
         if (body != null) {
@@ -34,6 +41,7 @@ public class SikhHistoryChatController {
                 history = (List<Map<String, String>>) list;
             }
         }
-        return chatService.chat(message, history);
+        SaasPrincipal principal = currentSaasUser.optional();
+        return chatService.chat(apiKey, principal == null ? null : principal.getUser(), message, history);
     }
 }
