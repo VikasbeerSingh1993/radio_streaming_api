@@ -216,8 +216,19 @@ public class CredentialService {
         current.forEach((key, value) ->
                 decrypted.put(key, isSecretKey(key) ? crypto.decrypt(value) : value));
         if (TYPE_MYSQL.equals(normalize(type)) && MysqlConnectionFields.isComplete(decrypted)) {
+            boolean changed = false;
+            String host = decrypted.get("host");
+            if (host != null && isLoopbackHost(host)) {
+                // Railway/Docker often leaves 127.0.0.1 in Mongo; Gurbani MySQL is remote.
+                decrypted.put("host", MysqlConnectionFields.DEFAULT_HOST);
+                changed = true;
+                log.warn("Replaced loopback MySQL host with {}", MysqlConnectionFields.DEFAULT_HOST);
+            }
             if (!current.containsKey("useSsl")) {
                 decrypted.putIfAbsent("useSsl", MysqlConnectionFields.DEFAULT_USE_SSL);
+                changed = true;
+            }
+            if (changed) {
                 saveMasked(type, decrypted);
             }
             return;
@@ -305,6 +316,11 @@ public class CredentialService {
 
     static boolean isSecretKey(String key) {
         return key != null && SECRET_KEYS.contains(key.replace(" ", "").toLowerCase(Locale.ROOT));
+    }
+
+    private static boolean isLoopbackHost(String host) {
+        String h = host.trim().toLowerCase(Locale.ROOT);
+        return "127.0.0.1".equals(h) || "localhost".equals(h) || "::1".equals(h) || "0.0.0.0".equals(h);
     }
 
     private static boolean isBlankOrMasked(String value) {
