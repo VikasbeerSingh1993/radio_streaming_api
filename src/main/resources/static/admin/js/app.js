@@ -921,7 +921,8 @@
       };
       var typeLabels = {
         GMAIL: { username: "Gmail Username", password: "App Password" },
-        MONGO: { username: "Mongo Username", password: "Mongo Password" }
+        MONGO: { username: "Mongo Username", password: "Mongo Password" },
+        MYSQL: { username: "MySQL Username", password: "MySQL Password", host: "MySQL Host", port: "MySQL Port", database: "Database Name" }
       };
       var placeholders = {
         GMAIL: {
@@ -951,6 +952,13 @@
           cluster: "e.g. cluster0.abc123.mongodb.net",
           database: "e.g. divine_bliss_streaming",
           srv: "true"
+        },
+        MYSQL: {
+          host: "e.g. mysql.example.com or Railway private host",
+          port: "e.g. 3306",
+          username: "e.g. bani_user",
+          password: "Leave blank to keep the saved password",
+          database: "bani_search"
         }
       };
       $scope.items = [];

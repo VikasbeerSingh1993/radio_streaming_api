@@ -29,6 +29,7 @@ public class CredentialService {
     public static final String TYPE_B2 = "B2";
     public static final String TYPE_GEO = "GEO";
     public static final String TYPE_MONGO = "MONGO";
+    public static final String TYPE_MYSQL = "MYSQL";
     static final String MASK = "********";
     private static final Logger log = LoggerFactory.getLogger(CredentialService.class);
     private static final Set<String> SECRET_KEYS = Set.of(
@@ -55,6 +56,7 @@ public class CredentialService {
             case TYPE_B2 -> 1;
             case TYPE_GEO -> 2;
             case TYPE_MONGO -> 3;
+            case TYPE_MYSQL -> 4;
             default -> 9;
         }));
         return views;
@@ -241,6 +243,13 @@ public class CredentialService {
             fields.putIfAbsent("password", "");
             fields.putIfAbsent("cluster", "");
             fields.putIfAbsent("database", "");
+        }
+        if (TYPE_MYSQL.equals(document.getType())) {
+            fields.putIfAbsent("host", "");
+            fields.putIfAbsent("port", "3306");
+            fields.putIfAbsent("username", "");
+            fields.putIfAbsent("password", "");
+            fields.putIfAbsent("database", "bani_search");
         }
         view.put("fields", fields);
         return view;

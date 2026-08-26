@@ -576,7 +576,7 @@
     <div class="page-head">
       <div>
         <h1>Settings</h1>
-        <div class="muted">Gmail, Backblaze, geo, and Mongo credentials are stored in the common <code>app_credentials</code> table. Secrets are encrypted. Railway <code>MONGODB_URI</code> is only used to open that table on boot.</div>
+        <div class="muted">Gmail, Backblaze, geo, Mongo, and MySQL (<code>bani_search</code>) credentials are stored in the common <code>app_credentials</code> table. Secrets are encrypted. Railway <code>MONGODB_URI</code> / <code>MYSQL_*</code> env vars bootstrap on boot. Restart the API after saving MYSQL so the singleton pool reloads.</div>
       </div>
     </div>
     <div class="table-loader" ng-if="pageLoading">

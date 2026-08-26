@@ -18,14 +18,29 @@ public class CredentialBootstrap {
     private final CredentialService credentialService;
     private final String mongoUri;
     private final String mongoDatabase;
+    private final String mysqlHost;
+    private final String mysqlPort;
+    private final String mysqlUsername;
+    private final String mysqlPassword;
+    private final String mysqlDatabase;
 
     public CredentialBootstrap(
             CredentialService credentialService,
             @Value("${spring.data.mongodb.uri}") String mongoUri,
-            @Value("${spring.data.mongodb.database:divine_bliss_streaming}") String mongoDatabase) {
+            @Value("${spring.data.mongodb.database:divine_bliss_streaming}") String mongoDatabase,
+            @Value("${app.mysql.host:}") String mysqlHost,
+            @Value("${app.mysql.port:3306}") String mysqlPort,
+            @Value("${app.mysql.username:}") String mysqlUsername,
+            @Value("${app.mysql.password:}") String mysqlPassword,
+            @Value("${app.mysql.database:bani_search}") String mysqlDatabase) {
         this.credentialService = credentialService;
         this.mongoUri = mongoUri;
         this.mongoDatabase = mongoDatabase;
+        this.mysqlHost = mysqlHost;
+        this.mysqlPort = mysqlPort;
+        this.mysqlUsername = mysqlUsername;
+        this.mysqlPassword = mysqlPassword;
+        this.mysqlDatabase = mysqlDatabase;
     }
 
     @Order(0)
@@ -37,9 +52,20 @@ public class CredentialBootstrap {
             credentialService.seedIfMissing(CredentialService.TYPE_GEO, geoFields());
             credentialService.ensurePhotonProvider();
             credentialService.seedIfMissing(CredentialService.TYPE_MONGO, mongoFields());
+            credentialService.seedIfMissing(CredentialService.TYPE_MYSQL, mysqlFields());
         } catch (Exception ex) {
             log.warn("Could not seed app credentials; they can be added from admin Settings", ex);
         }
+    }
+
+    private Map<String, String> mysqlFields() {
+        Map<String, String> fields = new LinkedHashMap<>();
+        fields.put("host", mysqlHost == null || mysqlHost.isBlank() ? "127.0.0.1" : mysqlHost.trim());
+        fields.put("port", mysqlPort == null || mysqlPort.isBlank() ? "3306" : mysqlPort.trim());
+        fields.put("username", mysqlUsername == null ? "" : mysqlUsername.trim());
+        fields.put("password", mysqlPassword == null ? "" : mysqlPassword);
+        fields.put("database", mysqlDatabase == null || mysqlDatabase.isBlank() ? "bani_search" : mysqlDatabase.trim());
+        return fields;
     }
 
     private Map<String, String> mongoFields() {
