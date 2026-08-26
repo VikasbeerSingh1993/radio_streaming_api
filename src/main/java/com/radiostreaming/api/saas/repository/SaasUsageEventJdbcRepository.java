@@ -140,4 +140,18 @@ public class SaasUsageEventJdbcRepository implements SaasUsageEventRepository {
                 userId);
         return n == null ? 0L : n;
     }
+
+    @Override
+    public long countByUserIdAndOperationSince(String userId, String operation, java.time.Instant since) {
+        Long n = jdbc.queryForObject(
+                """
+                SELECT COUNT(*) FROM saas_usage_events
+                WHERE user_id = ? AND operation = ? AND created_at >= ?
+                """,
+                Long.class,
+                userId,
+                operation,
+                SaasJdbcSupport.toTimestamp(since));
+        return n == null ? 0L : n;
+    }
 }

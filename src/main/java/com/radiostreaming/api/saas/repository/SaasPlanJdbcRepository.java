@@ -16,8 +16,9 @@ import java.util.Optional;
 public class SaasPlanJdbcRepository implements SaasPlanRepository {
 
     private static final String COLUMNS = """
-            id, code, name, description, price_cents, credits_included,
+            id, code, name, description, price_cents, price_currency, credits_included,
             credit_cost_ocr, credit_cost_ai_image, credit_cost_sikh_history, credit_cost_gurbani_ai,
+            daily_limit_sikh_history, daily_limit_gurbani_ai,
             features_json, active, sort_order, created_at, updated_at
             """;
 
@@ -37,11 +38,15 @@ public class SaasPlanJdbcRepository implements SaasPlanRepository {
             p.setName(rs.getString("name"));
             p.setDescription(rs.getString("description"));
             p.setPriceCents(rs.getInt("price_cents"));
+            String currency = rs.getString("price_currency");
+            p.setPriceCurrency(currency == null || currency.isBlank() ? "INR" : currency);
             p.setCreditsIncluded(rs.getLong("credits_included"));
             p.setCreditCostOcr(rs.getInt("credit_cost_ocr"));
             p.setCreditCostAiImage(rs.getInt("credit_cost_ai_image"));
             p.setCreditCostSikhHistory(rs.getInt("credit_cost_sikh_history"));
             p.setCreditCostGurbaniAi(rs.getInt("credit_cost_gurbani_ai"));
+            p.setDailyLimitSikhHistory(rs.getInt("daily_limit_sikh_history"));
+            p.setDailyLimitGurbaniAi(rs.getInt("daily_limit_gurbani_ai"));
             String featuresJson = rs.getString("features_json");
             p.setFeatures(new ArrayList<>(SaasJdbcSupport.readStringList(objectMapper, featuresJson)));
             p.setActive(SaasJdbcSupport.toBoolean(rs.getInt("active")));
@@ -67,6 +72,9 @@ public class SaasPlanJdbcRepository implements SaasPlanRepository {
     @Override
     public SaasPlanDocument save(SaasPlanDocument plan) {
         plan.setId(SaasJdbcSupport.newIdIfBlank(plan.getId()));
+        if (plan.getPriceCurrency() == null || plan.getPriceCurrency().isBlank()) {
+            plan.setPriceCurrency("INR");
+        }
         String featuresJson = SaasJdbcSupport.writeJson(objectMapper, plan.getFeatures());
         boolean exists = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM saas_plans WHERE id = ?",
@@ -75,9 +83,11 @@ public class SaasPlanJdbcRepository implements SaasPlanRepository {
         if (exists) {
             jdbc.update("""
                     UPDATE saas_plans SET
-                      code = ?, name = ?, description = ?, price_cents = ?, credits_included = ?,
+                      code = ?, name = ?, description = ?, price_cents = ?, price_currency = ?,
+                      credits_included = ?,
                       credit_cost_ocr = ?, credit_cost_ai_image = ?, credit_cost_sikh_history = ?,
-                      credit_cost_gurbani_ai = ?, features_json = ?, active = ?, sort_order = ?,
+                      credit_cost_gurbani_ai = ?, daily_limit_sikh_history = ?, daily_limit_gurbani_ai = ?,
+                      features_json = ?, active = ?, sort_order = ?,
                       created_at = ?, updated_at = ?
                     WHERE id = ?
                     """,
@@ -85,11 +95,14 @@ public class SaasPlanJdbcRepository implements SaasPlanRepository {
                     plan.getName(),
                     plan.getDescription(),
                     plan.getPriceCents(),
+                    plan.getPriceCurrency(),
                     plan.getCreditsIncluded(),
                     plan.getCreditCostOcr(),
                     plan.getCreditCostAiImage(),
                     plan.getCreditCostSikhHistory(),
                     plan.getCreditCostGurbaniAi(),
+                    plan.getDailyLimitSikhHistory(),
+                    plan.getDailyLimitGurbaniAi(),
                     featuresJson,
                     SaasJdbcSupport.toTinyInt(plan.isActive()),
                     plan.getSortOrder(),
@@ -99,21 +112,25 @@ public class SaasPlanJdbcRepository implements SaasPlanRepository {
         } else {
             jdbc.update("""
                     INSERT INTO saas_plans (
-                      id, code, name, description, price_cents, credits_included,
+                      id, code, name, description, price_cents, price_currency, credits_included,
                       credit_cost_ocr, credit_cost_ai_image, credit_cost_sikh_history, credit_cost_gurbani_ai,
+                      daily_limit_sikh_history, daily_limit_gurbani_ai,
                       features_json, active, sort_order, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     plan.getId(),
                     plan.getCode(),
                     plan.getName(),
                     plan.getDescription(),
                     plan.getPriceCents(),
+                    plan.getPriceCurrency(),
                     plan.getCreditsIncluded(),
                     plan.getCreditCostOcr(),
                     plan.getCreditCostAiImage(),
                     plan.getCreditCostSikhHistory(),
                     plan.getCreditCostGurbaniAi(),
+                    plan.getDailyLimitSikhHistory(),
+                    plan.getDailyLimitGurbaniAi(),
                     featuresJson,
                     SaasJdbcSupport.toTinyInt(plan.isActive()),
                     plan.getSortOrder(),
@@ -160,3 +177,4 @@ public class SaasPlanJdbcRepository implements SaasPlanRepository {
         }
     }
 }
+

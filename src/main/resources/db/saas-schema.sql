@@ -5,11 +5,14 @@ CREATE TABLE IF NOT EXISTS saas_plans (
   name VARCHAR(128) NOT NULL,
   description TEXT NULL,
   price_cents INT NOT NULL DEFAULT 0,
+  price_currency VARCHAR(8) NOT NULL DEFAULT 'INR',
   credits_included BIGINT NOT NULL DEFAULT 0,
   credit_cost_ocr INT NOT NULL DEFAULT 5,
   credit_cost_ai_image INT NOT NULL DEFAULT 10,
   credit_cost_sikh_history INT NOT NULL DEFAULT 2,
   credit_cost_gurbani_ai INT NOT NULL DEFAULT 3,
+  daily_limit_sikh_history INT NOT NULL DEFAULT 5,
+  daily_limit_gurbani_ai INT NOT NULL DEFAULT 5,
   features_json JSON NULL,
   active TINYINT(1) NOT NULL DEFAULT 1,
   sort_order INT NOT NULL DEFAULT 0,
@@ -18,6 +21,11 @@ CREATE TABLE IF NOT EXISTS saas_plans (
   UNIQUE KEY uq_saas_plans_code (code),
   KEY idx_saas_plans_active_sort (active, sort_order)
 );
+
+-- Additive migrations for existing divine_bliss_web installs (continueOnError ignores duplicates)
+ALTER TABLE saas_plans ADD COLUMN price_currency VARCHAR(8) NOT NULL DEFAULT 'INR';
+ALTER TABLE saas_plans ADD COLUMN daily_limit_sikh_history INT NOT NULL DEFAULT 5;
+ALTER TABLE saas_plans ADD COLUMN daily_limit_gurbani_ai INT NOT NULL DEFAULT 5;
 
 CREATE TABLE IF NOT EXISTS saas_users (
   id CHAR(36) PRIMARY KEY,

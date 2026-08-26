@@ -21,4 +21,6 @@ public interface SaasUsageEventRepository {
     Page<SaasUsageEventDocument> findByUserIdOrderByCreatedAtDesc(String userId, Pageable pageable);
 
     long countByUserId(String userId);
+
+    long countByUserIdAndOperationSince(String userId, String operation, java.time.Instant since);
 }

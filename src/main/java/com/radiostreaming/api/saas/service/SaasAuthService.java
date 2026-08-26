@@ -15,7 +15,9 @@ import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.http.HttpStatus;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -42,6 +44,8 @@ public class SaasAuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final CredentialService credentialService;
+    private final TaskExecutor mailTaskExecutor;
+    private final CreditMeteringService creditMeteringService;
     private final boolean logOtp;
     private final SecureRandom random = new SecureRandom();
 
@@ -52,6 +56,8 @@ public class SaasAuthService {
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
             CredentialService credentialService,
+            @Qualifier("mailTaskExecutor") TaskExecutor mailTaskExecutor,
+            CreditMeteringService creditMeteringService,
             @Value("${app.mail.log-otp:false}") boolean logOtp) {
         this.userRepository = userRepository;
         this.pendingRepository = pendingRepository;
@@ -59,6 +65,8 @@ public class SaasAuthService {
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.credentialService = credentialService;
+        this.mailTaskExecutor = mailTaskExecutor;
+        this.creditMeteringService = creditMeteringService;
         this.logOtp = logOtp;
     }
 
@@ -101,12 +109,12 @@ public class SaasAuthService {
         pending.setVerifyAttempts(0);
         pending.setUpdatedAt(now);
         pendingRepository.save(pending);
-        deliverOtp(email, first, otp);
+        queueOtpDelivery(email, first, otp);
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", "otp_sent");
         body.put("email", email);
-        body.put("message", "We sent a verification code to your email. Enter it to finish signing up.");
+        body.put("message", "Check your email for a verification code. Enter it to finish signing up.");
         body.put("otpExpiresInSeconds", OTP_TTL.toSeconds());
         return body;
     }
@@ -139,10 +147,11 @@ public class SaasAuthService {
         user.setPasswordHash(pending.getPasswordHash());
         user.setRole("USER");
         user.setEnabled(true);
-        user.setCreditsRemaining(50);
+        user.setCreditsRemaining(0);
         user.setCreditsUsed(0);
         user.setCreditsPending(0);
-        user.setPlanName("Free starter");
+        user.setPlanId(null);
+        user.setPlanName(null);
         user.setCreatedAt(now);
         user.setUpdatedAt(now);
         SaasUserDocument saved = userRepository.save(user);
@@ -166,11 +175,11 @@ public class SaasAuthService {
         pending.setVerifyAttempts(0);
         pending.setUpdatedAt(now);
         pendingRepository.save(pending);
-        deliverOtp(email, pending.getFirstName(), otp);
+        queueOtpDelivery(email, pending.getFirstName(), otp);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", "otp_sent");
         body.put("email", email);
-        body.put("message", "A new verification code was sent.");
+        body.put("message", "Check your email — a new verification code was sent.");
         return body;
     }
 
@@ -191,6 +200,7 @@ public class SaasAuthService {
     public Map<String, Object> me(SaasUserDocument user) {
         Map<String, Object> body = profile(user);
         body.put("apiHits", usageEventRepository.countByUserId(user.getId()));
+        body.putAll(creditMeteringService.dailyUsageSnapshot(user));
         return body;
     }
 
@@ -219,15 +229,16 @@ public class SaasAuthService {
         return userRepository.findByEmailIgnoreCase(email).orElse(null);
     }
 
+    /** Persist first, then send mail off-thread so Railway / Gmail latency does not block the HTTP response. */
+    private void queueOtpDelivery(String email, String firstName, String otp) {
+        mailTaskExecutor.execute(() -> deliverOtp(email, firstName, otp));
+    }
+
     private void deliverOtp(String email, String firstName, String otp) {
         JavaMailSender sender = credentialService.mailSender().orElse(null);
         if (sender == null) {
             log.info("Signup OTP for {} ({}): {} — configure GMAIL in app_credentials for email delivery",
                     firstName, maskEmail(email), otp);
-            if (!logOtp) {
-                // Still allow signup in environments without mail; OTP is logged for ops.
-                return;
-            }
             return;
         }
         try {

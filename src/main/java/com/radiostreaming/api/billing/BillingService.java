@@ -68,7 +68,7 @@ public class BillingService {
         body.put("plan", plan);
         body.put("creditsRemaining", user.getCreditsRemaining());
         body.put("billingEventId", event.getId());
-        body.put("message", "Plan purchased. Credits were added to your account.");
+        body.put("message", "Plan purchased. Credits were added to your account. You can upgrade anytime for higher daily History limits.");
         return body;
     }
 

@@ -16,8 +16,11 @@ public class SaasPlanDocument {
     private String name;
     private String description;
 
-    /** Price in USD cents */
+    /** Price in minor units (paise for INR). */
     private int priceCents;
+
+    /** ISO currency code; AI plans use INR. */
+    private String priceCurrency = "INR";
 
     private long creditsIncluded;
 
@@ -28,6 +31,12 @@ public class SaasPlanDocument {
     private int creditCostSikhHistory = 2;
 
     private int creditCostGurbaniAi = 3;
+
+    /** Max Sikh History questions per calendar day (hard max 100). */
+    private int dailyLimitSikhHistory = 5;
+
+    /** Max Gurbani AI questions per calendar day (hard max 100). */
+    private int dailyLimitGurbaniAi = 5;
 
     private List<String> features = new ArrayList<>();
 
@@ -78,6 +87,14 @@ public class SaasPlanDocument {
         this.priceCents = priceCents;
     }
 
+    public String getPriceCurrency() {
+        return priceCurrency;
+    }
+
+    public void setPriceCurrency(String priceCurrency) {
+        this.priceCurrency = priceCurrency;
+    }
+
     public long getCreditsIncluded() {
         return creditsIncluded;
     }
@@ -116,6 +133,22 @@ public class SaasPlanDocument {
 
     public void setCreditCostGurbaniAi(int creditCostGurbaniAi) {
         this.creditCostGurbaniAi = creditCostGurbaniAi;
+    }
+
+    public int getDailyLimitSikhHistory() {
+        return dailyLimitSikhHistory;
+    }
+
+    public void setDailyLimitSikhHistory(int dailyLimitSikhHistory) {
+        this.dailyLimitSikhHistory = dailyLimitSikhHistory;
+    }
+
+    public int getDailyLimitGurbaniAi() {
+        return dailyLimitGurbaniAi;
+    }
+
+    public void setDailyLimitGurbaniAi(int dailyLimitGurbaniAi) {
+        this.dailyLimitGurbaniAi = dailyLimitGurbaniAi;
     }
 
     public List<String> getFeatures() {
@@ -158,3 +191,4 @@ public class SaasPlanDocument {
         this.updatedAt = updatedAt;
     }
 }
+

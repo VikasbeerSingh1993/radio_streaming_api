@@ -86,6 +86,15 @@ public class SaasPlanAdminController {
         if (incoming.getCreditCostGurbaniAi() > 0) {
             plan.setCreditCostGurbaniAi(incoming.getCreditCostGurbaniAi());
         }
+        if (incoming.getDailyLimitSikhHistory() > 0) {
+            plan.setDailyLimitSikhHistory(Math.min(100, incoming.getDailyLimitSikhHistory()));
+        }
+        if (incoming.getDailyLimitGurbaniAi() > 0) {
+            plan.setDailyLimitGurbaniAi(Math.min(100, incoming.getDailyLimitGurbaniAi()));
+        }
+        if (incoming.getPriceCurrency() != null && !incoming.getPriceCurrency().isBlank()) {
+            plan.setPriceCurrency(incoming.getPriceCurrency().trim().toUpperCase());
+        }
         if (incoming.getFeatures() != null) {
             plan.setFeatures(incoming.getFeatures());
         }
