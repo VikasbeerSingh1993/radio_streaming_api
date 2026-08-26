@@ -73,12 +73,12 @@ public class SaasBootstrap {
         // Azure ~₹0.45/History query; Free ₹100 covers ~150/mo (~₹40 Azure) with ~₹60 margin.
         // Credits sized so History cost 2 ≈ monthly History quota + OCR/image headroom.
         upsert(plan("ai-free", "AI Free Tier",
-                "Required to use AI History, OCR, AI Images, and Gurbani AI. 5 Sikh History questions per day.",
+                "Required to use AI History, OCR, AI Images, and Gurbani AI Search (voice). 5 Sikh History questions per day.",
                 10_000, 300, 5, 10, 2, 3, 5, 5,
                 List.of(
                         "₹100 / month",
                         "5 Sikh History questions / day",
-                        "300 credits (History, OCR, AI images, Gurbani AI)",
+                        "300 credits (History, OCR, AI images, voice Gurbani search)",
                         "Upgrade anytime to Basic, Pro, or Max"),
                 1, now));
 
@@ -89,7 +89,7 @@ public class SaasBootstrap {
                         "₹399 / month",
                         "20 Sikh History questions / day",
                         "900 credits",
-                        "OCR, AI images, and Gurbani AI included"),
+                        "OCR, AI images, and Gurbani AI Search included"),
                 2, now));
 
         upsert(plan("ai-pro", "AI Pro",

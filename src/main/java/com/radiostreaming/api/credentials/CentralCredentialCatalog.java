@@ -40,6 +40,8 @@ public final class CentralCredentialCatalog {
         fields.put("endpointUrl", "https://s3.us-east-005.backblazeb2.com");
         fields.put("applicationKeyId", "41a1bdb99cac");
         fields.put("applicationKey", "0055d31ae347164d6f058cd6409e78e80ead403f4f");
+        // Optional CDN / friendly public base for catalog images (leave blank to use endpoint/bucket path).
+        fields.put("publicBaseUrl", "");
         return fields;
     }
 

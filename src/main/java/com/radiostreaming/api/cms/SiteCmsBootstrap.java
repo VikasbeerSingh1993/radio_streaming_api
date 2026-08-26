@@ -30,6 +30,15 @@ public class SiteCmsBootstrap {
         putSetting("header_tagline", "Kirtan · Gurbani · Seva tools", now);
         putSetting("footer_text", "Live Kirtan, Gurbani search, and respectful AI tools for sangat and seva.", now);
         putSetting("footer_copyright", "Divine Bliss", now);
+        putSetting("nav_home", "Home", now);
+        putSetting("nav_services", "Services", now);
+        putSetting("nav_radio", "Live Kirtan & Radio", now);
+        putSetting("nav_gurbani", "Gurbani Search", now);
+        putSetting("nav_gurbani_ai", "Gurbani AI Search", now);
+        putSetting("nav_history", "Sikh History", now);
+        putSetting("nav_ocr", "Punjabi OCR", now);
+        putSetting("nav_ai_images", "AI Images", now);
+        putSetting("nav_plans", "Plans", now);
 
         putPage("home",
                 "Listen, learn, and serve with clarity",
@@ -38,7 +47,7 @@ public class SiteCmsBootstrap {
                 now);
         putPage("plans",
                 "Choose a plan that fits your seva",
-                "Credits cover Punjabi OCR, AI images, Sikh History AI, and Gurbani AI search.",
+                "Credits cover Punjabi OCR, AI images, Sikh History AI, and Gurbani AI Search (voice).",
                 null,
                 now);
         putPage("radio",
@@ -48,7 +57,7 @@ public class SiteCmsBootstrap {
                 now);
         putPage("gurbani",
                 "Gurbani Search",
-                "Find lines by word or starting letters. See Ang, writer, and translations when available.",
+                "Find lines by word or starting letters. Open LCD view for single-line projector display.",
                 null,
                 now);
         putPage("history",
@@ -58,9 +67,25 @@ public class SiteCmsBootstrap {
                 now);
         putPage("gurbani-ai",
                 "Gurbani AI Search",
-                "Ask natural questions about Gurbani meaning and context. Uses plan credits.",
+                "Use voice or live kirtan audio to find lines in the Gurbani database. Uses plan credits.",
                 null,
                 now);
+        // Refresh copy if an older Q&A subtitle was seeded earlier
+        jdbc.update("""
+                UPDATE site_pages SET title = ?, subtitle = ?, updated_at = ?
+                WHERE page_key = 'gurbani-ai'
+                  AND (subtitle LIKE '%natural questions%' OR subtitle LIKE '%Q&A%' OR title = 'Gurbani AI')
+                """,
+                "Gurbani AI Search",
+                "Use voice or live kirtan audio to find lines in the Gurbani database. Uses plan credits.",
+                Timestamp.from(now));
+        jdbc.update("""
+                UPDATE site_settings SET setting_value = ?, updated_at = ?
+                WHERE setting_key = 'nav_gurbani_ai'
+                  AND (setting_value IS NULL OR setting_value IN ('Gurbani AI', 'Gurbai AI', ''))
+                """,
+                "Gurbani AI Search", Timestamp.from(now));
+
         putPage("ocr",
                 "Punjabi OCR",
                 "Upload a photo of Gurmukhi text and read it on screen. Uses plan credits.",

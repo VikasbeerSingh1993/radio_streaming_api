@@ -644,3 +644,67 @@ th {
   .page-head { flex-direction: column; }
   .login-card { padding: 28px 20px; }
 }
+
+.accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.accordion.nested {
+  margin-top: 8px;
+  gap: 8px;
+}
+
+.accordion-item {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(18, 35, 58, 0.04);
+  overflow: hidden;
+}
+
+.accordion-head {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 0;
+  background: #f7f9fc;
+  color: var(--text);
+  font-weight: 700;
+  font-family: Outfit, "Source Sans 3", sans-serif;
+  font-size: 1rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.accordion-item.open > .accordion-head {
+  background: linear-gradient(90deg, rgba(200, 137, 42, 0.12), rgba(27, 51, 88, 0.06));
+  border-bottom: 1px solid var(--line);
+}
+
+.accordion-chevron {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--navy);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.accordion-body {
+  padding: 16px;
+}
+
+.accordion.nested .accordion-head {
+  background: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+}

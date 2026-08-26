@@ -10,11 +10,14 @@ import com.radiostreaming.api.model.EventDocument;
 import com.radiostreaming.api.model.StationDocument;
 import com.radiostreaming.api.service.AdminCatalogService;
 import com.radiostreaming.api.service.AdminUserService;
+import com.radiostreaming.api.service.B2ObjectStorageService;
 import com.radiostreaming.api.service.CredentialService;
 import com.radiostreaming.api.service.CurrentAdmin;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -27,16 +30,19 @@ public class AdminApiController {
     private final AdminCatalogService adminCatalogService;
     private final AdminUserService adminUserService;
     private final CredentialService credentialService;
+    private final B2ObjectStorageService b2ObjectStorageService;
     private final CurrentAdmin currentAdmin;
 
     public AdminApiController(
             AdminCatalogService adminCatalogService,
             AdminUserService adminUserService,
             CredentialService credentialService,
+            B2ObjectStorageService b2ObjectStorageService,
             CurrentAdmin currentAdmin) {
         this.adminCatalogService = adminCatalogService;
         this.adminUserService = adminUserService;
         this.credentialService = credentialService;
+        this.b2ObjectStorageService = b2ObjectStorageService;
         this.currentAdmin = currentAdmin;
     }
 
@@ -53,6 +59,18 @@ public class AdminApiController {
     @PostMapping("/cache/reload")
     public Map<String, Object> reloadCache() {
         return adminCatalogService.reloadCache();
+    }
+
+    /**
+     * Upload a catalog image to Backblaze B2 and return a public URL.
+     * Paste the returned {@code url} into station/category {@code thumbnail}.
+     */
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Map<String, String> uploadCatalogImage(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "folder", required = false, defaultValue = "radio_catalog") String folder) {
+        currentAdmin.require();
+        return b2ObjectStorageService.uploadCatalogImage(file, folder);
     }
 
     @GetMapping("/events")

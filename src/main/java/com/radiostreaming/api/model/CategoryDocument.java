@@ -23,6 +23,8 @@ public class CategoryDocument {
     @TextIndexed
     private String category;
     private String icon;
+    /** Public image URL (e.g. B2/S3) shown on web and apps. */
+    private String thumbnail;
     private Integer order;
     private Map<String, Map<String, String>> translations;
 
@@ -55,6 +57,14 @@ public class CategoryDocument {
 
     public void setIcon(String icon) {
         this.icon = icon;
+    }
+
+    public String getThumbnail() {
+        return thumbnail;
+    }
+
+    public void setThumbnail(String thumbnail) {
+        this.thumbnail = thumbnail;
     }
 
     public Integer getOrder() {

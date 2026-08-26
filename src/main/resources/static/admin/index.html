@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/admin/css/admin.css?v=20260826a">
+  <link rel="stylesheet" href="/admin/css/admin.css?v=20260826b">
 </head>
 <body>
   <div id="admin-boot" style="min-height:100vh;display:grid;place-items:center;background:#eef2f7;color:#5b6b7c;font-family:sans-serif">Loading admin console...</div>
@@ -48,7 +48,7 @@
       <a class="nav-link" href="#/categories" ng-if="can('categories','read')" ng-class="{active: isActive('/categories')}" ng-click="closeSidebar()">Categories</a>
       <a class="nav-link" href="#/links" ng-if="can('audioLinks','read')" ng-class="{active: isActive('/links')}" ng-click="closeSidebar()">Audio links</a>
       <a class="nav-link" href="#/users" ng-if="can('users','read')" ng-class="{active: isActive('/users')}" ng-click="closeSidebar()">Sub-admins</a>
-      <a class="nav-link" href="#/website" ng-if="profile.superAdmin" ng-class="{active: isActive('/website')}" ng-click="closeSidebar()">Website</a>
+      <a class="nav-link" href="#/website" ng-if="profile.superAdmin" ng-class="{active: isActive('/website')}" ng-click="closeSidebar()">Website content</a>
       <a class="nav-link" href="#/settings" ng-if="profile.superAdmin" ng-class="{active: isActive('/settings')}" ng-click="closeSidebar()">Settings</a>
     </aside>
     <section class="main">
@@ -577,66 +577,131 @@
     <div class="page-head">
       <div>
         <h1>Website content</h1>
-        <div class="muted">Super admin only. Edit logo, brand, page titles, and home images for the React site. Stored in MySQL <code>divine_bliss_web</code>.</div>
+        <div class="muted">Super admin only. Expand a section to edit brand, menu labels, pages, or home images. Stored in MySQL <code>divine_bliss_web</code>.</div>
       </div>
       <button class="btn btn-info btn-sm" type="button" ng-click="load()" ng-disabled="pageLoading">Refresh</button>
     </div>
     <div class="table-loader" ng-if="pageLoading">
       <div class="spinner"></div>
-      <p>Loading website content...</p>
+      <p>Loading website content…</p>
     </div>
     <div class="form-error" ng-if="formError">{{formError}}</div>
 
-    <div class="panel" ng-if="!pageLoading">
-      <h3>Brand &amp; layout</h3>
-      <form novalidate ng-submit="saveSettings()">
-        <div class="grid-2">
-          <label class="field"><span>Brand name</span><input ng-model="settings.brand_name" placeholder="Divine Bliss"></label>
-          <label class="field"><span>Logo image URL</span><input ng-model="settings.logo_url" placeholder="https://..."></label>
-          <label class="field"><span>Header tagline</span><input ng-model="settings.header_tagline" placeholder="Kirtan · Gurbani · Seva tools"></label>
-          <label class="field"><span>Footer copyright</span><input ng-model="settings.footer_copyright" placeholder="Divine Bliss"></label>
-          <label class="field" style="grid-column:1 / -1"><span>Footer text</span><input ng-model="settings.footer_text" placeholder="Short footer description"></label>
+    <div class="accordion" ng-if="!pageLoading">
+      <div class="accordion-item" ng-class="{open: isOpen('brand')}">
+        <button type="button" class="accordion-head" ng-click="toggle('brand')">
+          <span>Brand &amp; logo</span>
+          <span class="accordion-chevron">{{isOpen('brand') ? '−' : '+'}}</span>
+        </button>
+        <div class="accordion-body" ng-show="isOpen('brand')">
+          <p class="muted">Site name and logo shown in the header and footer.</p>
+          <form novalidate ng-submit="saveSettings()">
+            <div class="grid-2">
+              <label class="field"><span>Brand name</span><input ng-model="settings.brand_name" placeholder="Divine Bliss"></label>
+              <label class="field"><span>Logo image URL</span><input ng-model="settings.logo_url" placeholder="https://..."></label>
+              <label class="field" style="grid-column:1 / -1"><span>Header tagline</span><input ng-model="settings.header_tagline" placeholder="Kirtan · Gurbani · Seva tools"></label>
+            </div>
+            <div class="muted" ng-if="settings.logo_url" style="margin:12px 0">
+              Preview: <img ng-src="{{settings.logo_url}}" alt="" style="height:40px;width:40px;border-radius:50%;object-fit:cover;vertical-align:middle">
+            </div>
+            <button class="btn btn-primary btn-sm" type="submit" ng-disabled="saving">Save brand &amp; logo</button>
+          </form>
         </div>
-        <div class="modal-actions" style="justify-content:flex-start">
-          <button class="btn btn-primary btn-sm" type="submit" ng-disabled="saving">Save brand settings</button>
-        </div>
-      </form>
-      <div class="muted" ng-if="settings.logo_url" style="margin-top:12px">
-        Preview: <img ng-src="{{settings.logo_url}}" alt="" style="height:40px;width:40px;border-radius:50%;object-fit:cover;vertical-align:middle">
       </div>
-    </div>
 
-    <div class="panel" ng-if="!pageLoading">
-      <h3>Page titles &amp; descriptions</h3>
-      <p class="muted">Each public page can show its own title and subtitle from the database.</p>
-      <div class="panel" style="box-shadow:none;border:1px solid #dbe3ee;margin-bottom:12px" ng-repeat="page in pages">
-        <strong>{{page.key}}</strong>
-        <div class="grid-2" style="margin-top:8px">
-          <label class="field"><span>Title</span><input ng-model="page.title"></label>
-          <label class="field"><span>Hero image URL (home)</span><input ng-model="page.heroImageUrl" placeholder="optional"></label>
-          <label class="field" style="grid-column:1 / -1"><span>Subtitle</span><input ng-model="page.subtitle"></label>
+      <div class="accordion-item" ng-class="{open: isOpen('nav')}">
+        <button type="button" class="accordion-head" ng-click="toggle('nav')">
+          <span>Header menu labels</span>
+          <span class="accordion-chevron">{{isOpen('nav') ? '−' : '+'}}</span>
+        </button>
+        <div class="accordion-body" ng-show="isOpen('nav')">
+          <p class="muted">Rename links shown in the website header. Use clear Title Case (example: Gurbani AI Search).</p>
+          <form novalidate ng-submit="saveNavLabels()">
+            <div class="grid-2">
+              <label class="field" ng-repeat="item in navItems">
+                <span>{{item.adminLabel}}</span>
+                <input ng-model="settings[item.key]" placeholder="{{item.placeholder}}">
+              </label>
+            </div>
+            <button class="btn btn-primary btn-sm" type="submit" ng-disabled="saving">Save header menu labels</button>
+          </form>
         </div>
-        <button class="btn btn-ghost btn-sm" type="button" ng-click="savePage(page)" ng-disabled="saving">Save {{page.key}}</button>
       </div>
-    </div>
 
-    <div class="panel" ng-if="!pageLoading">
-      <h3>Home page images</h3>
-      <p class="muted">Slots: <code>home_hero</code>, <code>home_feature_1</code>, <code>home_feature_2</code>, <code>home_feature_3</code>.</p>
-      <div class="panel" style="box-shadow:none;border:1px solid #dbe3ee;margin-bottom:12px" ng-repeat="item in media">
-        <div class="grid-2">
-          <label class="field"><span>Slot key</span><input ng-model="item.slotKey"></label>
-          <label class="field"><span>Label</span><input ng-model="item.label"></label>
-          <label class="field" style="grid-column:1 / -1"><span>Image URL</span><input ng-model="item.imageUrl"></label>
-          <label class="field"><span>Link URL</span><input ng-model="item.linkUrl"></label>
-          <label class="field"><span>Sort order</span><input type="number" ng-model="item.sortOrder"></label>
+      <div class="accordion-item" ng-class="{open: isOpen('footer')}">
+        <button type="button" class="accordion-head" ng-click="toggle('footer')">
+          <span>Footer</span>
+          <span class="accordion-chevron">{{isOpen('footer') ? '−' : '+'}}</span>
+        </button>
+        <div class="accordion-body" ng-show="isOpen('footer')">
+          <form novalidate ng-submit="saveFooter()">
+            <div class="grid-2">
+              <label class="field" style="grid-column:1 / -1"><span>Footer text</span><input ng-model="settings.footer_text" placeholder="Short footer description"></label>
+              <label class="field"><span>Footer copyright name</span><input ng-model="settings.footer_copyright" placeholder="Divine Bliss"></label>
+            </div>
+            <button class="btn btn-primary btn-sm" type="submit" ng-disabled="saving">Save footer</button>
+          </form>
         </div>
-        <div class="muted" ng-if="item.imageUrl" style="margin:8px 0">
-          <img ng-src="{{item.imageUrl}}" alt="" style="max-height:80px;border-radius:8px;object-fit:cover">
-        </div>
-        <button class="btn btn-ghost btn-sm" type="button" ng-click="saveMedia(item)" ng-disabled="saving">Save image</button>
       </div>
-      <button class="btn btn-primary btn-sm" type="button" ng-click="addMedia()" ng-disabled="saving">Add image slot</button>
+
+      <div class="accordion-item" ng-class="{open: isOpen('pages')}">
+        <button type="button" class="accordion-head" ng-click="toggle('pages')">
+          <span>Page titles &amp; descriptions</span>
+          <span class="accordion-chevron">{{isOpen('pages') ? '−' : '+'}}</span>
+        </button>
+        <div class="accordion-body" ng-show="isOpen('pages')">
+          <p class="muted">Each public page has its own title and subtitle. Expand a page to edit.</p>
+          <div class="accordion nested" ng-repeat="page in pages">
+            <div class="accordion-item" ng-class="{open: isOpen('page-' + page.key)}">
+              <button type="button" class="accordion-head" ng-click="toggle('page-' + page.key)">
+                <span>{{pageLabel(page.key)}}</span>
+                <span class="accordion-chevron">{{isOpen('page-' + page.key) ? '−' : '+'}}</span>
+              </button>
+              <div class="accordion-body" ng-show="isOpen('page-' + page.key)">
+                <div class="muted" style="margin-bottom:8px">Key: <code>{{page.key}}</code></div>
+                <div class="grid-2">
+                  <label class="field"><span>Title</span><input ng-model="page.title"></label>
+                  <label class="field"><span>Hero image URL</span><input ng-model="page.heroImageUrl" placeholder="Optional"></label>
+                  <label class="field" style="grid-column:1 / -1"><span>Subtitle</span><input ng-model="page.subtitle"></label>
+                </div>
+                <button class="btn btn-ghost btn-sm" type="button" ng-click="savePage(page)" ng-disabled="saving">Save {{pageLabel(page.key)}}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item" ng-class="{open: isOpen('media')}">
+        <button type="button" class="accordion-head" ng-click="toggle('media')">
+          <span>Home page images</span>
+          <span class="accordion-chevron">{{isOpen('media') ? '−' : '+'}}</span>
+        </button>
+        <div class="accordion-body" ng-show="isOpen('media')">
+          <p class="muted">Hero and feature images on the home page. Expand a slot to edit.</p>
+          <div class="accordion nested" ng-repeat="item in media">
+            <div class="accordion-item" ng-class="{open: isOpen('media-' + ($index))}">
+              <button type="button" class="accordion-head" ng-click="toggle('media-' + $index)">
+                <span>{{mediaLabel(item)}}</span>
+                <span class="accordion-chevron">{{isOpen('media-' + $index) ? '−' : '+'}}</span>
+              </button>
+              <div class="accordion-body" ng-show="isOpen('media-' + $index)">
+                <div class="grid-2">
+                  <label class="field"><span>Slot key</span><input ng-model="item.slotKey"></label>
+                  <label class="field"><span>Display label</span><input ng-model="item.label"></label>
+                  <label class="field" style="grid-column:1 / -1"><span>Image URL</span><input ng-model="item.imageUrl"></label>
+                  <label class="field"><span>Link URL</span><input ng-model="item.linkUrl"></label>
+                  <label class="field"><span>Sort order</span><input type="number" ng-model="item.sortOrder"></label>
+                </div>
+                <div class="muted" ng-if="item.imageUrl" style="margin:8px 0">
+                  <img ng-src="{{item.imageUrl}}" alt="" style="max-height:80px;border-radius:8px;object-fit:cover">
+                </div>
+                <button class="btn btn-ghost btn-sm" type="button" ng-click="saveMedia(item)" ng-disabled="saving">Save image</button>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" type="button" ng-click="addMedia()" ng-disabled="saving" style="margin-top:12px">Add image slot</button>
+        </div>
+      </div>
     </div>
   </script>
 
@@ -701,7 +766,7 @@
           "https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.8.3/angular-route.min.js"
         ]);
       }).then(function () {
-        return loadScript("/admin/js/app.js?v=20260826a");
+        return loadScript("/admin/js/app.js?v=20260826b");
       }).then(function () {
         var boot = document.getElementById("admin-boot");
         if (boot) { boot.remove(); }

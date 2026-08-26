@@ -35,7 +35,7 @@ public class SaasPlanDocument {
     /** Max Sikh History questions per calendar day (hard max 100). */
     private int dailyLimitSikhHistory = 5;
 
-    /** Max Gurbani AI questions per calendar day (hard max 100). */
+    /** Max Gurbani AI voice searches per calendar day (hard max 100). */
     private int dailyLimitGurbaniAi = 5;
 
     private List<String> features = new ArrayList<>();

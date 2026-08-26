@@ -188,6 +188,15 @@
       saveWebsiteSettings: function (body) { return $http.put(base + "/website/settings", body); },
       saveWebsitePage: function (pageKey, body) { return $http.put(base + "/website/pages/" + pageKey, body); },
       saveWebsiteMedia: function (body) { return $http.put(base + "/website/media", body); },
+      uploadImage: function (file, folder) {
+        var fd = new FormData();
+        fd.append("file", file);
+        if (folder) { fd.append("folder", folder); }
+        return $http.post(base + "/upload", fd, {
+          headers: { "Content-Type": undefined },
+          transformRequest: angular.identity
+        });
+      },
       geoCountries: function () { return $http.get("/api/geo/countries"); },
       geoStates: function (countryCode) {
         return $http.get("/api/geo/states", { params: { countryCode: countryCode } });
@@ -692,7 +701,8 @@
       loadLookups($scope, Api, CatalogStore);
       $scope.openCreate = function () {
         $scope.formError = "";
-        $scope.form = { live: true, play_mode: "sequence", type: "radio", language: "en", nameEn: "", nameHi: "", namePa: "", category: "" };
+        $scope.uploadBusy = false;
+        $scope.form = { live: true, play_mode: "sequence", type: "radio", language: "en", nameEn: "", nameHi: "", namePa: "", category: "", thumbnail: "" };
       };
       $scope.openEdit = function (station) {
         $scope.formError = "";
@@ -703,6 +713,20 @@
         $scope.form.play_mode = station.play_mode || station.playMode || "sequence";
         $scope.form.language = station.language || "en";
         $scope.form.type = station.type || "radio";
+        $scope.uploadBusy = false;
+      };
+      $scope.uploadThumbnail = function (files) {
+        if (!files || !files.length || !$scope.form) { return; }
+        $scope.uploadBusy = true;
+        $scope.formError = "";
+        Api.uploadImage(files[0], "stations").then(function (res) {
+          $scope.form.thumbnail = res.data.url;
+          $rootScope.flash = { error: false, text: "Image uploaded. Save the station to keep it." };
+        }).catch(function (err) {
+          $scope.formError = (err.data && err.data.message) || "Image upload failed.";
+        }).finally(function () {
+          $scope.uploadBusy = false;
+        });
       };
       $scope.save = function () {
         if (!$scope.form.nameEn) {
@@ -748,16 +772,31 @@
       }
       $scope.openCreate = function () {
         $scope.formError = "";
+        $scope.uploadBusy = false;
         withIconOption("music_note");
-        $scope.form = { order: 1, icon: "music_note", nameEn: "", nameHi: "", namePa: "", category: "" };
+        $scope.form = { order: 1, icon: "music_note", nameEn: "", nameHi: "", namePa: "", category: "", thumbnail: "" };
       };
       $scope.openEdit = function (category) {
         $scope.formError = "";
+        $scope.uploadBusy = false;
         $scope.form = angular.copy(category);
         $scope.form.nameEn = (category.translations && category.translations.en && category.translations.en.name) || "";
         $scope.form.nameHi = (category.translations && category.translations.hi && category.translations.hi.name) || "";
         $scope.form.namePa = (category.translations && category.translations.pa && category.translations.pa.name) || "";
         withIconOption($scope.form.icon);
+      };
+      $scope.uploadThumbnail = function (files) {
+        if (!files || !files.length || !$scope.form) { return; }
+        $scope.uploadBusy = true;
+        $scope.formError = "";
+        Api.uploadImage(files[0], "categories").then(function (res) {
+          $scope.form.thumbnail = res.data.url;
+          $rootScope.flash = { error: false, text: "Image uploaded. Save the category to keep it." };
+        }).catch(function (err) {
+          $scope.formError = (err.data && err.data.message) || "Image upload failed.";
+        }).finally(function () {
+          $scope.uploadBusy = false;
+        });
       };
       $scope.save = function () {
         if (!$scope.form.category || !$scope.form.nameEn) {
@@ -910,18 +949,91 @@
         $location.path("/dashboard");
         return;
       }
+      var PAGE_LABELS = {
+        home: "Home",
+        services: "Services",
+        radio: "Live Kirtan & Radio",
+        gurbani: "Gurbani Search",
+        "gurbani-ai": "Gurbani AI Search",
+        history: "Sikh History AI",
+        ocr: "Punjabi OCR",
+        "ai-images": "AI Images",
+        plans: "Plans"
+      };
+      var MEDIA_LABELS = {
+        home_hero: "Home hero image",
+        home_feature_1: "Home feature 1",
+        home_feature_2: "Home feature 2",
+        home_feature_3: "Home feature 3"
+      };
+      var NAV_DEFAULTS = {
+        nav_home: "Home",
+        nav_services: "Services",
+        nav_radio: "Live Kirtan & Radio",
+        nav_gurbani: "Gurbani Search",
+        nav_gurbani_ai: "Gurbani AI Search",
+        nav_history: "Sikh History",
+        nav_ocr: "Punjabi OCR",
+        nav_ai_images: "AI Images",
+        nav_plans: "Plans"
+      };
+      $scope.navItems = [
+        { key: "nav_home", adminLabel: "Home", placeholder: "Home" },
+        { key: "nav_services", adminLabel: "Services", placeholder: "Services" },
+        { key: "nav_radio", adminLabel: "Live Kirtan & Radio", placeholder: "Live Kirtan & Radio" },
+        { key: "nav_gurbani", adminLabel: "Gurbani Search", placeholder: "Gurbani Search" },
+        { key: "nav_gurbani_ai", adminLabel: "Gurbani AI Search", placeholder: "Gurbani AI Search" },
+        { key: "nav_history", adminLabel: "Sikh History", placeholder: "Sikh History" },
+        { key: "nav_ocr", adminLabel: "Punjabi OCR", placeholder: "Punjabi OCR" },
+        { key: "nav_ai_images", adminLabel: "AI Images", placeholder: "AI Images" },
+        { key: "nav_plans", adminLabel: "Plans", placeholder: "Plans" }
+      ];
       $scope.settings = {};
       $scope.pages = [];
       $scope.media = [];
+      $scope.open = { brand: true };
       $scope.pageLoading = true;
       $scope.saving = false;
       $scope.formError = "";
+      $scope.isOpen = function (key) { return !!$scope.open[key]; };
+      $scope.toggle = function (key) {
+        $scope.open[key] = !$scope.open[key];
+      };
+      $scope.pageLabel = function (key) {
+        return PAGE_LABELS[key] || titleCaseKey(key);
+      };
+      $scope.mediaLabel = function (item) {
+        if (item && item.label) { return item.label; }
+        if (item && MEDIA_LABELS[item.slotKey]) { return MEDIA_LABELS[item.slotKey]; }
+        return titleCaseKey((item && item.slotKey) || "Image");
+      };
+      function titleCaseKey(key) {
+        return String(key || "")
+          .replace(/[_-]+/g, " ")
+          .replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+      }
+      function applyNavDefaults(settings) {
+        Object.keys(NAV_DEFAULTS).forEach(function (key) {
+          if (!settings[key]) { settings[key] = NAV_DEFAULTS[key]; }
+        });
+        if (settings.nav_gurbani_ai === "Gurbani AI" || settings.nav_gurbani_ai === "Gurbai AI") {
+          settings.nav_gurbani_ai = "Gurbani AI Search";
+        }
+        return settings;
+      }
+      function pickSettings(keys) {
+        var body = {};
+        keys.forEach(function (key) {
+          body[key] = $scope.settings[key] || "";
+        });
+        return body;
+      }
       $scope.load = function () {
         $scope.pageLoading = true;
         $scope.formError = "";
         Api.websiteContent().then(function (res) {
           var data = res.data || {};
-          $scope.settings = data.settings || {};
+          $scope.settings = applyNavDefaults(data.settings || {});
           var pagesMap = data.pages || {};
           $scope.pages = Object.keys(pagesMap).sort().map(function (key) {
             var p = pagesMap[key] || {};
@@ -953,11 +1065,35 @@
       $scope.saveSettings = function () {
         $scope.saving = true;
         $scope.formError = "";
-        Api.saveWebsiteSettings($scope.settings).then(function (res) {
-          $scope.settings = res.data || $scope.settings;
-          $scope.$root.flash = { text: "Brand settings saved." };
+        Api.saveWebsiteSettings(pickSettings(["brand_name", "logo_url", "header_tagline"])).then(function (res) {
+          $scope.settings = applyNavDefaults(Object.assign({}, $scope.settings, res.data || {}));
+          $scope.$root.flash = { text: "Brand and logo saved." };
         }).catch(function (err) {
-          flashError($scope, err, "Could not save settings.");
+          flashError($scope, err, "Could not save brand settings.");
+        }).finally(function () {
+          $scope.saving = false;
+        });
+      };
+      $scope.saveNavLabels = function () {
+        $scope.saving = true;
+        $scope.formError = "";
+        Api.saveWebsiteSettings(pickSettings(Object.keys(NAV_DEFAULTS))).then(function (res) {
+          $scope.settings = applyNavDefaults(Object.assign({}, $scope.settings, res.data || {}));
+          $scope.$root.flash = { text: "Header menu labels saved." };
+        }).catch(function (err) {
+          flashError($scope, err, "Could not save header menu labels.");
+        }).finally(function () {
+          $scope.saving = false;
+        });
+      };
+      $scope.saveFooter = function () {
+        $scope.saving = true;
+        $scope.formError = "";
+        Api.saveWebsiteSettings(pickSettings(["footer_text", "footer_copyright"])).then(function (res) {
+          $scope.settings = applyNavDefaults(Object.assign({}, $scope.settings, res.data || {}));
+          $scope.$root.flash = { text: "Footer saved." };
+        }).catch(function (err) {
+          flashError($scope, err, "Could not save footer.");
         }).finally(function () {
           $scope.saving = false;
         });
@@ -971,7 +1107,7 @@
           heroImageUrl: page.heroImageUrl,
           bodyHtml: page.bodyHtml
         }).then(function () {
-          $scope.$root.flash = { text: "Page “" + page.key + "” saved." };
+          $scope.$root.flash = { text: $scope.pageLabel(page.key) + " page saved." };
         }).catch(function (err) {
           flashError($scope, err, "Could not save page.");
         }).finally(function () {
@@ -984,7 +1120,7 @@
         Api.saveWebsiteMedia(item).then(function (res) {
           var saved = res.data || item;
           item.id = saved.id || item.id;
-          $scope.$root.flash = { text: "Image slot “" + item.slotKey + "” saved." };
+          $scope.$root.flash = { text: $scope.mediaLabel(item) + " saved." };
         }).catch(function (err) {
           flashError($scope, err, "Could not save media.");
         }).finally(function () {
@@ -1000,6 +1136,8 @@
           sortOrder: $scope.media.length + 1,
           active: true
         });
+        $scope.open["media-" + ($scope.media.length - 1)] = true;
+        $scope.open.media = true;
       };
       $scope.load();
     }]);
