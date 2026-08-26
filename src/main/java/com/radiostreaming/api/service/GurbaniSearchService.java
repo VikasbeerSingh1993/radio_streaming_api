@@ -2,6 +2,7 @@ package com.radiostreaming.api.service;
 
 import com.radiostreaming.api.dto.GurbaniSearchHit;
 import com.radiostreaming.api.dto.GurbaniSearchPage;
+import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
@@ -9,6 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 
+import javax.sql.DataSource;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -28,12 +30,17 @@ public class GurbaniSearchService {
     private static final int MAX_SIZE = 50;
 
     private final JdbcTemplate jdbc;
+    private final DataSource dataSource;
 
-    public GurbaniSearchService(JdbcTemplate jdbc) {
+    public GurbaniSearchService(JdbcTemplate jdbc, DataSource dataSource) {
         this.jdbc = jdbc;
+        this.dataSource = dataSource;
     }
 
     public boolean isAvailable() {
+        if (!hasLikelyCredentials()) {
+            return false;
+        }
         try {
             Integer one = jdbc.queryForObject("SELECT 1", Integer.class);
             return one != null && one == 1;
@@ -43,6 +50,9 @@ public class GurbaniSearchService {
     }
 
     public List<Map<String, Object>> listSources() {
+        if (!hasLikelyCredentials()) {
+            return staticSources();
+        }
         try {
             return jdbc.query(
                     "SELECT code, english, gurmukhi, unicode FROM sources ORDER BY FIELD(code,'G','D','B','S','A'), code",
@@ -76,6 +86,14 @@ public class GurbaniSearchService {
             result.setAvailable(isAvailable());
             result.setTotal(0);
             result.setMessage("Enter a search query");
+            return result;
+        }
+
+        if (!hasLikelyCredentials()) {
+            result.setAvailable(false);
+            result.setItems(List.of());
+            result.setTotal(0);
+            result.setMessage("Gurbani database is not available. Configure MYSQL credentials and restart.");
             return result;
         }
 
@@ -289,6 +307,14 @@ public class GurbaniSearchService {
             return "all";
         }
         return source.trim().toUpperCase(Locale.ROOT).substring(0, 1);
+    }
+
+    private boolean hasLikelyCredentials() {
+        if (dataSource instanceof HikariDataSource hikari) {
+            String user = hikari.getUsername();
+            return user != null && !user.isBlank();
+        }
+        return true;
     }
 
     private static String sanitizeLikePrefix(String value) {
