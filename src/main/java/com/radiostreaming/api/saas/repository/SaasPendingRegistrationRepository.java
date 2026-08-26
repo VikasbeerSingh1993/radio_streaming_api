@@ -1,11 +1,17 @@
 package com.radiostreaming.api.saas.repository;
 
 import com.radiostreaming.api.saas.model.SaasPendingRegistrationDocument;
-import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.Optional;
 
-public interface SaasPendingRegistrationRepository extends MongoRepository<SaasPendingRegistrationDocument, String> {
+public interface SaasPendingRegistrationRepository {
+    Optional<SaasPendingRegistrationDocument> findById(String id);
+
+    SaasPendingRegistrationDocument save(SaasPendingRegistrationDocument pending);
+
+    void delete(SaasPendingRegistrationDocument pending);
+
     Optional<SaasPendingRegistrationDocument> findByEmailIgnoreCase(String email);
+
     void deleteByEmailIgnoreCase(String email);
 }

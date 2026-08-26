@@ -29,6 +29,7 @@ public class CreditMeteringService {
     public static final String OP_OCR = "OCR_PUNJABI";
     public static final String OP_AI_IMAGE = "AI_IMAGE";
     public static final String OP_SIKH_HISTORY = "SIKH_HISTORY";
+    public static final String OP_GURBANI_AI = "GURBANI_AI";
 
     private final SaasUserRepository userRepository;
     private final SaasApiKeyRepository apiKeyRepository;
@@ -145,6 +146,7 @@ public class CreditMeteringService {
                     case OP_OCR -> plan.getCreditCostOcr() > 0 ? plan.getCreditCostOcr() : 5;
                     case OP_AI_IMAGE -> plan.getCreditCostAiImage() > 0 ? plan.getCreditCostAiImage() : 10;
                     case OP_SIKH_HISTORY -> plan.getCreditCostSikhHistory() > 0 ? plan.getCreditCostSikhHistory() : 2;
+                    case OP_GURBANI_AI -> plan.getCreditCostGurbaniAi() > 0 ? plan.getCreditCostGurbaniAi() : 3;
                     default -> 5;
                 };
             }
@@ -153,6 +155,7 @@ public class CreditMeteringService {
             case OP_OCR -> 5;
             case OP_AI_IMAGE -> 10;
             case OP_SIKH_HISTORY -> 2;
+            case OP_GURBANI_AI -> 3;
             default -> 5;
         };
     }

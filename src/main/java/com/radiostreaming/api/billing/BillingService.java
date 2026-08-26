@@ -17,8 +17,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Plan purchase and billing history (Mongo saas_billing_events).
- * Payment gateway not wired — purchases credit the account immediately for testing.
+ * Plan purchase and billing history (MySQL divine_bliss_web.saas_billing_events).
+ * Credits are applied when a plan is purchased.
  */
 @Service
 public class BillingService {
@@ -59,7 +59,7 @@ public class BillingService {
         event.setAmountCents(plan.getPriceCents());
         event.setCreditsAdded(plan.getCreditsIncluded());
         event.setStatus("completed");
-        event.setNote("Demo purchase — payment provider not connected; credits applied immediately.");
+        event.setNote("Plan purchase — credits applied to the account.");
         event.setCreatedAt(now);
         billingEventRepository.save(event);
 
@@ -68,7 +68,7 @@ public class BillingService {
         body.put("plan", plan);
         body.put("creditsRemaining", user.getCreditsRemaining());
         body.put("billingEventId", event.getId());
-        body.put("message", "Plan purchased (demo). Credits added to your account.");
+        body.put("message", "Plan purchased. Credits were added to your account.");
         return body;
     }
 

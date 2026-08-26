@@ -5,37 +5,50 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import java.util.Map;
 
 /**
- * Singleton HikariCP DataSource for Gurbani MySQL {@code bani_search} only.
- * Credentials come only from the central Mongo {@code app_credentials} store
- * (seeded from {@link com.radiostreaming.api.credentials.CentralCredentialCatalog}).
- * No Railway / env MySQL secrets.
+ * Primary MySQL pool for Gurbani {@code bani_search}.
  */
 @Configuration
 public class MysqlConfig {
 
     private static final Logger log = LoggerFactory.getLogger(MysqlConfig.class);
 
-    @Bean(destroyMethod = "close")
-    public DataSource dataSource(AppCredentialsReader credentialsReader) {
+    @Bean(name = "baniSearchDataSource", destroyMethod = "close")
+    @Primary
+    public DataSource baniSearchDataSource(AppCredentialsReader credentialsReader) {
         Map<String, String> merged = credentialsReader.resolveMysql();
-        String host = merged.get("host");
-        int port = parsePort(merged.get("port"), 3306);
-        String username = merged.get("username");
-        String password = merged.get("password");
-        String database = firstNonBlank(merged.get("database"), "bani_search");
-        boolean useSsl = Boolean.parseBoolean(merged.getOrDefault("useSsl", "false"));
+        return buildPool("bani-search-mysql", merged, firstNonBlank(merged.get("database"), "bani_search"));
+    }
+
+    @Bean
+    @Primary
+    public JdbcTemplate jdbcTemplate(@Qualifier("baniSearchDataSource") DataSource dataSource) {
+        return new JdbcTemplate(dataSource);
+    }
+
+    static HikariDataSource buildPool(String poolName, Map<String, String> creds, String database) {
+        String host = creds.get("host");
+        int port = parsePort(creds.get("port"), 3306);
+        String username = creds.get("username");
+        String password = creds.get("password");
+        boolean useSsl = Boolean.parseBoolean(creds.getOrDefault("useSsl", "false"));
 
         HikariConfig config = new HikariConfig();
-        config.setPoolName("bani-search-mysql");
+        config.setPoolName(poolName);
         config.setJdbcUrl("jdbc:mysql://" + host + ":" + port + "/" + database
                 + "?useUnicode=true&characterEncoding=utf8&connectionCollation=utf8mb4_0900_ai_ci"
                 + "&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=" + useSsl);
@@ -48,14 +61,36 @@ public class MysqlConfig {
         config.setDriverClassName("com.mysql.cj.jdbc.Driver");
 
         HikariDataSource dataSource = new HikariDataSource(config);
-        log.info("Created singleton MySQL DataSource for Gurbani DB '{}' at {}:{}", database, host, port);
+        log.info("Created MySQL DataSource '{}' for DB '{}' at {}:{}", poolName, database, host, port);
         pingQuietly(dataSource, host, port, database);
         return dataSource;
     }
 
-    @Bean
-    public JdbcTemplate jdbcTemplate(DataSource dataSource) {
-        return new JdbcTemplate(dataSource);
+    static void ensureDatabaseExists(Map<String, String> creds, String database) {
+        String host = creds.get("host");
+        int port = parsePort(creds.get("port"), 3306);
+        String username = creds.get("username");
+        String password = creds.get("password") == null ? "" : creds.get("password");
+        boolean useSsl = Boolean.parseBoolean(creds.getOrDefault("useSsl", "false"));
+        String url = "jdbc:mysql://" + host + ":" + port
+                + "/?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC"
+                + "&allowPublicKeyRetrieval=true&useSSL=" + useSsl;
+        try (Connection connection = DriverManager.getConnection(url, username, password);
+             Statement statement = connection.createStatement()) {
+            statement.executeUpdate("CREATE DATABASE IF NOT EXISTS `" + database
+                    + "` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci");
+            log.info("Ensured MySQL database '{}' exists on {}:{}", database, host, port);
+        } catch (Exception ex) {
+            throw new IllegalStateException("Could not create MySQL database " + database + ": " + ex.getMessage(), ex);
+        }
+    }
+
+    static void applySchema(DataSource dataSource, String classpathSql) {
+        ResourceDatabasePopulator populator = new ResourceDatabasePopulator();
+        populator.addScript(new ClassPathResource(classpathSql));
+        populator.setContinueOnError(true);
+        populator.execute(dataSource);
+        log.info("Applied schema script {}", classpathSql);
     }
 
     private static void pingQuietly(HikariDataSource dataSource, String host, int port, String database) {
@@ -66,12 +101,12 @@ public class MysqlConfig {
                 log.info("MySQL connectivity OK for {} at {}:{}", database, host, port);
             }
         } catch (Exception ex) {
-            log.warn("MySQL not reachable at {}:{} — Gurbani search will degrade. {}",
-                    host, port, ex.getMessage());
+            log.warn("MySQL not reachable at {}:{} — DB '{}' may be unavailable. {}",
+                    host, port, database, ex.getMessage());
         }
     }
 
-    private static String firstNonBlank(String... values) {
+    static String firstNonBlank(String... values) {
         if (values == null) {
             return "";
         }
@@ -83,7 +118,7 @@ public class MysqlConfig {
         return "";
     }
 
-    private static int parsePort(String value, int fallback) {
+    static int parsePort(String value, int fallback) {
         try {
             return value == null || value.isBlank() ? fallback : Integer.parseInt(value.trim());
         } catch (NumberFormatException ex) {

@@ -2,24 +2,17 @@ package com.radiostreaming.api.saas.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.Indexed;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.Instant;
 
 /**
- * SaaS account user stored in Mongo (not MySQL bani_search).
+ * SaaS account user stored in MySQL {@code divine_bliss_web}.
  */
-@Document(collection = "saas_users")
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class SaasUserDocument {
 
-    @Id
     private String id;
 
-    @Indexed(unique = true)
     private String email;
 
     private String displayName;
@@ -36,19 +29,14 @@ public class SaasUserDocument {
 
     private String planName;
 
-    @Field("credits_remaining")
     private long creditsRemaining;
 
-    @Field("credits_used")
     private long creditsUsed;
 
-    @Field("credits_pending")
     private long creditsPending;
 
-    @Field("allow_ocr_overage")
     private boolean allowOcrOverage;
 
-    @Field("allow_ai_image_overage")
     private boolean allowAiImageOverage;
 
     private Instant createdAt;

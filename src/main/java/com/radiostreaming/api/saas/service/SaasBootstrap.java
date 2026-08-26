@@ -39,20 +39,22 @@ public class SaasBootstrap {
     public void seedPlansAndAdmin() {
         Instant now = Instant.now();
         if (planRepository.count() == 0) {
-            planRepository.save(plan("starter", "Starter", "Try Punjabi OCR & AI images", 900, 200, 5, 10, 2,
-                    defaultFeatures(200), 1, now));
-            planRepository.save(plan("growth", "Growth", "For small teams and apps", 2900, 1000, 4, 8, 2,
-                    defaultFeatures(1000), 2, now));
-            planRepository.save(plan("scale", "Scale", "High volume SaaS usage", 9900, 5000, 3, 6, 1,
-                    defaultFeatures(5000), 3, now));
-            log.info("Seeded default SaaS plans in Mongo collection saas_plans");
+            planRepository.save(plan("starter", "Starter", "Credits for OCR, AI images, and AI search tools",
+                    900, 200, 5, 10, 2, 3, defaultFeatures(200), 1, now));
+            planRepository.save(plan("growth", "Growth", "More credits for growing teams and apps",
+                    2900, 1000, 4, 8, 2, 3, defaultFeatures(1000), 2, now));
+            planRepository.save(plan("scale", "Scale", "Best rates for high daily usage",
+                    9900, 5000, 3, 6, 1, 2, defaultFeatures(5000), 3, now));
+            log.info("Seeded SaaS plans in MySQL divine_bliss_web.saas_plans");
         } else {
-            // Keep existing prices/credits; ensure Sikh History is listed and costed.
             for (SaasPlanDocument existing : planRepository.findAll()) {
                 boolean changed = false;
                 if (existing.getCreditCostSikhHistory() <= 0) {
-                    int cost = "scale".equalsIgnoreCase(existing.getCode()) ? 1 : 2;
-                    existing.setCreditCostSikhHistory(cost);
+                    existing.setCreditCostSikhHistory("scale".equalsIgnoreCase(existing.getCode()) ? 1 : 2);
+                    changed = true;
+                }
+                if (existing.getCreditCostGurbaniAi() <= 0) {
+                    existing.setCreditCostGurbaniAi("scale".equalsIgnoreCase(existing.getCode()) ? 2 : 3);
                     changed = true;
                 }
                 List<String> features = existing.getFeatures() == null
@@ -60,15 +62,24 @@ public class SaasBootstrap {
                         : new ArrayList<>(existing.getFeatures());
                 if (features.stream().noneMatch(f -> f.toLowerCase().contains("sikh history"))) {
                     features.add("AI Sikh History search");
-                    existing.setFeatures(features);
                     changed = true;
                 }
+                if (features.stream().noneMatch(f -> f.toLowerCase().contains("gurbani ai"))) {
+                    features.add("Gurbani AI search");
+                    changed = true;
+                }
+                // Drop demo/jargon labels from description if present
+                if (existing.getDescription() != null && existing.getDescription().toLowerCase().contains("demo")) {
+                    existing.setDescription("Credits for OCR, AI images, and AI search tools");
+                    changed = true;
+                }
+                existing.setFeatures(features);
                 if (changed) {
                     existing.setUpdatedAt(now);
                     planRepository.save(existing);
                 }
             }
-            log.info("Ensured SaaS plans include AI Sikh History search");
+            log.info("Ensured SaaS plans include Sikh History and Gurbani AI search");
         }
 
         userRepository.findByEmailIgnoreCase("saas-admin@divinebliss.app").ifPresentOrElse(existing -> {
@@ -88,7 +99,7 @@ public class SaasBootstrap {
             admin.setCreatedAt(now);
             admin.setUpdatedAt(now);
             userRepository.save(admin);
-            log.info("Seeded SaaS admin saas-admin@divinebliss.app (change password after first login)");
+            log.info("Seeded SaaS admin saas-admin@divinebliss.app");
         });
     }
 
@@ -98,6 +109,7 @@ public class SaasBootstrap {
                 "Punjabi OCR",
                 "AI image generation",
                 "AI Sikh History search",
+                "Gurbani AI search",
                 "API key access");
     }
 
@@ -110,6 +122,7 @@ public class SaasBootstrap {
             int ocrCost,
             int imageCost,
             int sikhHistoryCost,
+            int gurbaniAiCost,
             List<String> features,
             int sort,
             Instant now) {
@@ -122,6 +135,7 @@ public class SaasBootstrap {
         p.setCreditCostOcr(ocrCost);
         p.setCreditCostAiImage(imageCost);
         p.setCreditCostSikhHistory(sikhHistoryCost);
+        p.setCreditCostGurbaniAi(gurbaniAiCost);
         p.setFeatures(features);
         p.setActive(true);
         p.setSortOrder(sort);

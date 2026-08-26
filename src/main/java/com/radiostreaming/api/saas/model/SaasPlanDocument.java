@@ -1,23 +1,16 @@
 package com.radiostreaming.api.saas.model;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.Indexed;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
-@Document(collection = "saas_plans")
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class SaasPlanDocument {
 
-    @Id
     private String id;
 
-    @Indexed
     private String code;
 
     private String name;
@@ -28,14 +21,13 @@ public class SaasPlanDocument {
 
     private long creditsIncluded;
 
-    @Field("credit_cost_ocr")
     private int creditCostOcr = 5;
 
-    @Field("credit_cost_ai_image")
     private int creditCostAiImage = 10;
 
-    @Field("credit_cost_sikh_history")
     private int creditCostSikhHistory = 2;
+
+    private int creditCostGurbaniAi = 3;
 
     private List<String> features = new ArrayList<>();
 
@@ -116,6 +108,14 @@ public class SaasPlanDocument {
 
     public void setCreditCostSikhHistory(int creditCostSikhHistory) {
         this.creditCostSikhHistory = creditCostSikhHistory;
+    }
+
+    public int getCreditCostGurbaniAi() {
+        return creditCostGurbaniAi;
+    }
+
+    public void setCreditCostGurbaniAi(int creditCostGurbaniAi) {
+        this.creditCostGurbaniAi = creditCostGurbaniAi;
     }
 
     public List<String> getFeatures() {

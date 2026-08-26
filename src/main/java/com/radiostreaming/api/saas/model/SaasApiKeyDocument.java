@@ -2,21 +2,14 @@ package com.radiostreaming.api.saas.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.Indexed;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.Instant;
 
-@Document(collection = "saas_api_keys")
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class SaasApiKeyDocument {
 
-    @Id
     private String id;
 
-    @Indexed
     private String userId;
 
     private String name;
@@ -24,7 +17,6 @@ public class SaasApiKeyDocument {
     /** First 8 chars of the key for display (dbsk_xxxx…) */
     private String keyPrefix;
 
-    @Indexed(unique = true)
     @JsonIgnore
     private String keyHash;
 
@@ -33,7 +25,6 @@ public class SaasApiKeyDocument {
     private Instant lastUsedAt;
     private Instant createdAt;
 
-    @Field("hit_count")
     private long hitCount;
 
     public String getId() {

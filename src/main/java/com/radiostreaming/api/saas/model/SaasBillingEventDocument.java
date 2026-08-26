@@ -1,20 +1,14 @@
 package com.radiostreaming.api.saas.model;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.Indexed;
-import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
-@Document(collection = "saas_billing_events")
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class SaasBillingEventDocument {
 
-    @Id
     private String id;
 
-    @Indexed
     private String userId;
 
     private String planId;

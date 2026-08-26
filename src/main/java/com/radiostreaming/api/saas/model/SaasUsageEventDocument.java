@@ -1,27 +1,20 @@
 package com.radiostreaming.api.saas.model;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.Indexed;
-import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 import java.util.Map;
 
-@Document(collection = "saas_usage_events")
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class SaasUsageEventDocument {
 
-    @Id
     private String id;
 
-    @Indexed
     private String userId;
 
     private String apiKeyId;
 
     /** OCR_PUNJABI, AI_IMAGE, etc. */
-    @Indexed
     private String operation;
 
     private int creditsCharged;

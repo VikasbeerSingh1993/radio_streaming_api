@@ -83,6 +83,9 @@ public class SaasPlanAdminController {
         if (incoming.getCreditCostSikhHistory() > 0) {
             plan.setCreditCostSikhHistory(incoming.getCreditCostSikhHistory());
         }
+        if (incoming.getCreditCostGurbaniAi() > 0) {
+            plan.setCreditCostGurbaniAi(incoming.getCreditCostGurbaniAi());
+        }
         if (incoming.getFeatures() != null) {
             plan.setFeatures(incoming.getFeatures());
         }

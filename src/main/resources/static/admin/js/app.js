@@ -52,6 +52,7 @@
         .when("/categories", { templateUrl: "categories.html", controller: "CategoriesCtrl" })
         .when("/links", { templateUrl: "links.html", controller: "LinksCtrl" })
         .when("/users", { templateUrl: "users.html", controller: "UsersCtrl" })
+        .when("/website", { templateUrl: "website.html", controller: "WebsiteCtrl" })
         .when("/settings", { templateUrl: "settings.html", controller: "SettingsCtrl" })
         .otherwise({ redirectTo: "/dashboard" });
       $httpProvider.interceptors.push("AuthInterceptor");
@@ -183,6 +184,10 @@
       deleteUser: function (id) { return $http.delete(base + "/users/" + id); },
       credentials: function () { return $http.get(base + "/credentials"); },
       saveCredential: function (type, fields) { return $http.put(base + "/credentials/" + type, fields); },
+      websiteContent: function () { return $http.get(base + "/website/content"); },
+      saveWebsiteSettings: function (body) { return $http.put(base + "/website/settings", body); },
+      saveWebsitePage: function (pageKey, body) { return $http.put(base + "/website/pages/" + pageKey, body); },
+      saveWebsiteMedia: function (body) { return $http.put(base + "/website/media", body); },
       geoCountries: function () { return $http.get("/api/geo/countries"); },
       geoStates: function (countryCode) {
         return $http.get("/api/geo/states", { params: { countryCode: countryCode } });
@@ -895,6 +900,106 @@
         runAction($scope, $rootScope, CatalogStore, "Deleting user...", function () {
           return Api.deleteUser(user.id);
         }, "User deleted.");
+      };
+      $scope.load();
+    }]);
+
+  app.controller("WebsiteCtrl", ["$scope", "Api", "$location",
+    function ($scope, Api, $location) {
+      if (!$scope.profile || !$scope.profile.superAdmin) {
+        $location.path("/dashboard");
+        return;
+      }
+      $scope.settings = {};
+      $scope.pages = [];
+      $scope.media = [];
+      $scope.pageLoading = true;
+      $scope.saving = false;
+      $scope.formError = "";
+      $scope.load = function () {
+        $scope.pageLoading = true;
+        $scope.formError = "";
+        Api.websiteContent().then(function (res) {
+          var data = res.data || {};
+          $scope.settings = data.settings || {};
+          var pagesMap = data.pages || {};
+          $scope.pages = Object.keys(pagesMap).sort().map(function (key) {
+            var p = pagesMap[key] || {};
+            return {
+              key: key,
+              title: p.title || "",
+              subtitle: p.subtitle || "",
+              heroImageUrl: p.heroImageUrl || "",
+              bodyHtml: p.bodyHtml || ""
+            };
+          });
+          $scope.media = (data.media || []).map(function (m) {
+            return {
+              id: m.id,
+              slotKey: m.slotKey || "",
+              label: m.label || "",
+              imageUrl: m.imageUrl || "",
+              linkUrl: m.linkUrl || "",
+              sortOrder: m.sortOrder || 0,
+              active: m.active !== false
+            };
+          });
+        }).catch(function (err) {
+          flashError($scope, err, "Could not load website content.");
+        }).finally(function () {
+          $scope.pageLoading = false;
+        });
+      };
+      $scope.saveSettings = function () {
+        $scope.saving = true;
+        $scope.formError = "";
+        Api.saveWebsiteSettings($scope.settings).then(function (res) {
+          $scope.settings = res.data || $scope.settings;
+          $scope.$root.flash = { text: "Brand settings saved." };
+        }).catch(function (err) {
+          flashError($scope, err, "Could not save settings.");
+        }).finally(function () {
+          $scope.saving = false;
+        });
+      };
+      $scope.savePage = function (page) {
+        $scope.saving = true;
+        $scope.formError = "";
+        Api.saveWebsitePage(page.key, {
+          title: page.title,
+          subtitle: page.subtitle,
+          heroImageUrl: page.heroImageUrl,
+          bodyHtml: page.bodyHtml
+        }).then(function () {
+          $scope.$root.flash = { text: "Page “" + page.key + "” saved." };
+        }).catch(function (err) {
+          flashError($scope, err, "Could not save page.");
+        }).finally(function () {
+          $scope.saving = false;
+        });
+      };
+      $scope.saveMedia = function (item) {
+        $scope.saving = true;
+        $scope.formError = "";
+        Api.saveWebsiteMedia(item).then(function (res) {
+          var saved = res.data || item;
+          item.id = saved.id || item.id;
+          $scope.$root.flash = { text: "Image slot “" + item.slotKey + "” saved." };
+        }).catch(function (err) {
+          flashError($scope, err, "Could not save media.");
+        }).finally(function () {
+          $scope.saving = false;
+        });
+      };
+      $scope.addMedia = function () {
+        $scope.media.push({
+          slotKey: "home_feature_" + ($scope.media.length + 1),
+          label: "New image",
+          imageUrl: "",
+          linkUrl: "/",
+          sortOrder: $scope.media.length + 1,
+          active: true
+        });
       };
       $scope.load();
     }]);

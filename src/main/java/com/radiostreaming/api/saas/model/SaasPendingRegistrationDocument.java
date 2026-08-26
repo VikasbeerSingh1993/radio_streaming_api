@@ -1,18 +1,11 @@
 package com.radiostreaming.api.saas.model;
 
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.Indexed;
-import org.springframework.data.mongodb.core.mapping.Document;
-
 import java.time.Instant;
 
-@Document(collection = "saas_pending_registrations")
 public class SaasPendingRegistrationDocument {
 
-    @Id
     private String id;
 
-    @Indexed(unique = true)
     private String email;
 
     private String firstName;

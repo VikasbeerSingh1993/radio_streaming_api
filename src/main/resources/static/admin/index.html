@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/admin/css/admin.css?v=20260824h">
+  <link rel="stylesheet" href="/admin/css/admin.css?v=20260826a">
 </head>
 <body>
   <div id="admin-boot" style="min-height:100vh;display:grid;place-items:center;background:#eef2f7;color:#5b6b7c;font-family:sans-serif">Loading admin console...</div>
@@ -48,6 +48,7 @@
       <a class="nav-link" href="#/categories" ng-if="can('categories','read')" ng-class="{active: isActive('/categories')}" ng-click="closeSidebar()">Categories</a>
       <a class="nav-link" href="#/links" ng-if="can('audioLinks','read')" ng-class="{active: isActive('/links')}" ng-click="closeSidebar()">Audio links</a>
       <a class="nav-link" href="#/users" ng-if="can('users','read')" ng-class="{active: isActive('/users')}" ng-click="closeSidebar()">Sub-admins</a>
+      <a class="nav-link" href="#/website" ng-if="profile.superAdmin" ng-class="{active: isActive('/website')}" ng-click="closeSidebar()">Website</a>
       <a class="nav-link" href="#/settings" ng-if="profile.superAdmin" ng-class="{active: isActive('/settings')}" ng-click="closeSidebar()">Settings</a>
     </aside>
     <section class="main">
@@ -572,11 +573,78 @@
     </div>
   </script>
 
+  <script type="text/ng-template" id="website.html">
+    <div class="page-head">
+      <div>
+        <h1>Website content</h1>
+        <div class="muted">Super admin only. Edit logo, brand, page titles, and home images for the React site. Stored in MySQL <code>divine_bliss_web</code>.</div>
+      </div>
+      <button class="btn btn-info btn-sm" type="button" ng-click="load()" ng-disabled="pageLoading">Refresh</button>
+    </div>
+    <div class="table-loader" ng-if="pageLoading">
+      <div class="spinner"></div>
+      <p>Loading website content...</p>
+    </div>
+    <div class="form-error" ng-if="formError">{{formError}}</div>
+
+    <div class="panel" ng-if="!pageLoading">
+      <h3>Brand &amp; layout</h3>
+      <form novalidate ng-submit="saveSettings()">
+        <div class="grid-2">
+          <label class="field"><span>Brand name</span><input ng-model="settings.brand_name" placeholder="Divine Bliss"></label>
+          <label class="field"><span>Logo image URL</span><input ng-model="settings.logo_url" placeholder="https://..."></label>
+          <label class="field"><span>Header tagline</span><input ng-model="settings.header_tagline" placeholder="Kirtan · Gurbani · Seva tools"></label>
+          <label class="field"><span>Footer copyright</span><input ng-model="settings.footer_copyright" placeholder="Divine Bliss"></label>
+          <label class="field" style="grid-column:1 / -1"><span>Footer text</span><input ng-model="settings.footer_text" placeholder="Short footer description"></label>
+        </div>
+        <div class="modal-actions" style="justify-content:flex-start">
+          <button class="btn btn-primary btn-sm" type="submit" ng-disabled="saving">Save brand settings</button>
+        </div>
+      </form>
+      <div class="muted" ng-if="settings.logo_url" style="margin-top:12px">
+        Preview: <img ng-src="{{settings.logo_url}}" alt="" style="height:40px;width:40px;border-radius:50%;object-fit:cover;vertical-align:middle">
+      </div>
+    </div>
+
+    <div class="panel" ng-if="!pageLoading">
+      <h3>Page titles &amp; descriptions</h3>
+      <p class="muted">Each public page can show its own title and subtitle from the database.</p>
+      <div class="panel" style="box-shadow:none;border:1px solid #dbe3ee;margin-bottom:12px" ng-repeat="page in pages">
+        <strong>{{page.key}}</strong>
+        <div class="grid-2" style="margin-top:8px">
+          <label class="field"><span>Title</span><input ng-model="page.title"></label>
+          <label class="field"><span>Hero image URL (home)</span><input ng-model="page.heroImageUrl" placeholder="optional"></label>
+          <label class="field" style="grid-column:1 / -1"><span>Subtitle</span><input ng-model="page.subtitle"></label>
+        </div>
+        <button class="btn btn-ghost btn-sm" type="button" ng-click="savePage(page)" ng-disabled="saving">Save {{page.key}}</button>
+      </div>
+    </div>
+
+    <div class="panel" ng-if="!pageLoading">
+      <h3>Home page images</h3>
+      <p class="muted">Slots: <code>home_hero</code>, <code>home_feature_1</code>, <code>home_feature_2</code>, <code>home_feature_3</code>.</p>
+      <div class="panel" style="box-shadow:none;border:1px solid #dbe3ee;margin-bottom:12px" ng-repeat="item in media">
+        <div class="grid-2">
+          <label class="field"><span>Slot key</span><input ng-model="item.slotKey"></label>
+          <label class="field"><span>Label</span><input ng-model="item.label"></label>
+          <label class="field" style="grid-column:1 / -1"><span>Image URL</span><input ng-model="item.imageUrl"></label>
+          <label class="field"><span>Link URL</span><input ng-model="item.linkUrl"></label>
+          <label class="field"><span>Sort order</span><input type="number" ng-model="item.sortOrder"></label>
+        </div>
+        <div class="muted" ng-if="item.imageUrl" style="margin:8px 0">
+          <img ng-src="{{item.imageUrl}}" alt="" style="max-height:80px;border-radius:8px;object-fit:cover">
+        </div>
+        <button class="btn btn-ghost btn-sm" type="button" ng-click="saveMedia(item)" ng-disabled="saving">Save image</button>
+      </div>
+      <button class="btn btn-primary btn-sm" type="button" ng-click="addMedia()" ng-disabled="saving">Add image slot</button>
+    </div>
+  </script>
+
   <script type="text/ng-template" id="settings.html">
     <div class="page-head">
       <div>
         <h1>Settings</h1>
-        <div class="muted">Gmail, Backblaze, geo, Mongo, and MySQL (<code>bani_search</code>) credentials live in the central <code>app_credentials</code> table (encrypted). Code catalog seeds missing rows at startup. Railway should only have <code>MONGODB_URI</code> (bootstrap). Restart the API after saving MYSQL so the singleton pool reloads.</div>
+        <div class="muted">Gmail, Backblaze, geo, Mongo, and MySQL (<code>bani_search</code>) credentials live in the central <code>app_credentials</code> table (encrypted). Code catalog seeds missing rows at startup. Railway should only have <code>MONGODB_URI</code> (bootstrap). Restart the API after saving MYSQL so the singleton pool reloads. SaaS users/plans/CMS use a separate DB <code>divine_bliss_web</code> on the same MySQL host.</div>
       </div>
     </div>
     <div class="table-loader" ng-if="pageLoading">
@@ -633,7 +701,7 @@
           "https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.8.3/angular-route.min.js"
         ]);
       }).then(function () {
-        return loadScript("/admin/js/app.js?v=20260824h");
+        return loadScript("/admin/js/app.js?v=20260826a");
       }).then(function () {
         var boot = document.getElementById("admin-boot");
         if (boot) { boot.remove(); }
