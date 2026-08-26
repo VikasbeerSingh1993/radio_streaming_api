@@ -1,18 +1,18 @@
 package com.radiostreaming.api.aiimages;
 
+import com.radiostreaming.api.saas.model.SaasUserDocument;
 import com.radiostreaming.api.saas.service.CreditMeteringService;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
 /**
  * Sikh-related AI image generation. Stub until provider key is in app_credentials.
- * Credits are charged per image requested.
+ * Credits are charged per image. Website uses JWT; API keys are for external apps.
  */
 @Service
 public class AiImageService {
@@ -23,14 +23,14 @@ public class AiImageService {
         this.meteringService = meteringService;
     }
 
-    public Map<String, Object> generate(String apiKey, String prompt, int count) {
+    public Map<String, Object> generate(String apiKey, SaasUserDocument sessionUser, String prompt, int count) {
         int n = Math.min(8, Math.max(1, count));
         String safePrompt = prompt == null || prompt.isBlank()
                 ? "Golden Harmandir Sahib at dusk, respectful Sikh spiritual art"
                 : prompt.trim();
 
         CreditMeteringService.MeteredCall call =
-                meteringService.authorizeAndPrepare(apiKey, CreditMeteringService.OP_AI_IMAGE, n);
+                meteringService.authorizeAndPrepare(apiKey, sessionUser, CreditMeteringService.OP_AI_IMAGE, n);
 
         List<Map<String, Object>> images = new ArrayList<>();
         for (int i = 0; i < n; i++) {

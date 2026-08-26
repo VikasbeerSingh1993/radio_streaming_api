@@ -1,5 +1,8 @@
 package com.radiostreaming.api.ocr;
 
+import com.radiostreaming.api.saas.security.CurrentSaasUser;
+import com.radiostreaming.api.saas.security.SaasPrincipal;
+import com.radiostreaming.api.saas.service.CreditMeteringService;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -16,16 +19,19 @@ import java.util.Map;
 public class PunjabiOcrController {
 
     private final PunjabiOcrService ocrService;
+    private final CurrentSaasUser currentSaasUser;
 
-    public PunjabiOcrController(PunjabiOcrService ocrService) {
+    public PunjabiOcrController(PunjabiOcrService ocrService, CurrentSaasUser currentSaasUser) {
         this.ocrService = ocrService;
+        this.currentSaasUser = currentSaasUser;
     }
 
     @PostMapping(value = "/punjabi", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Map<String, Object> punjabiMultipart(
             @RequestHeader(value = "X-API-Key", required = false) String apiKey,
             @RequestPart(value = "file", required = false) MultipartFile file) {
-        return ocrService.recognize(apiKey, file, null);
+        SaasPrincipal principal = currentSaasUser.optional();
+        return ocrService.recognize(apiKey, principal == null ? null : principal.getUser(), file, null);
     }
 
     @PostMapping(value = "/punjabi", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -33,6 +39,7 @@ public class PunjabiOcrController {
             @RequestHeader(value = "X-API-Key", required = false) String apiKey,
             @RequestBody(required = false) Map<String, Object> body) {
         String image = body == null || body.get("imageBase64") == null ? null : String.valueOf(body.get("imageBase64"));
-        return ocrService.recognize(apiKey, null, image);
+        SaasPrincipal principal = currentSaasUser.optional();
+        return ocrService.recognize(apiKey, principal == null ? null : principal.getUser(), null, image);
     }
 }

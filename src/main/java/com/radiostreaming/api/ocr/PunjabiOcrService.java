@@ -1,5 +1,6 @@
 package com.radiostreaming.api.ocr;
 
+import com.radiostreaming.api.saas.model.SaasUserDocument;
 import com.radiostreaming.api.saas.service.CreditMeteringService;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -7,12 +8,11 @@ import org.springframework.web.multipart.MultipartFile;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.Map;
 
 /**
  * Punjabi OCR SaaS. Demo/stub until a real OCR provider key is stored in app_credentials.
- * Credit metering is real.
+ * Credit metering is real. Website users authenticate with JWT; API keys are for external apps.
  */
 @Service
 public class PunjabiOcrService {
@@ -23,9 +23,10 @@ public class PunjabiOcrService {
         this.meteringService = meteringService;
     }
 
-    public Map<String, Object> recognize(String apiKey, MultipartFile file, String imageBase64) {
+    public Map<String, Object> recognize(
+            String apiKey, SaasUserDocument sessionUser, MultipartFile file, String imageBase64) {
         CreditMeteringService.MeteredCall call =
-                meteringService.authorizeAndPrepare(apiKey, CreditMeteringService.OP_OCR, 1);
+                meteringService.authorizeAndPrepare(apiKey, sessionUser, CreditMeteringService.OP_OCR, 1);
 
         String filename = file != null && !file.isEmpty() ? file.getOriginalFilename() : "inline.png";
         long bytes = 0;

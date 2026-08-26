@@ -47,18 +47,28 @@ public class CreditMeteringService {
 
     public record MeteredCall(SaasUserDocument user, SaasApiKeyDocument apiKey, int cost, boolean overage) {}
 
-    public MeteredCall authorizeAndPrepare(String rawApiKey, String operation, int units) {
-        if (rawApiKey == null || rawApiKey.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "API key required (X-API-Key header)");
+    /**
+     * Prefer API key for external integrations; otherwise charge the signed-in website user.
+     */
+    public MeteredCall authorizeAndPrepare(String rawApiKey, SaasUserDocument sessionUser, String operation, int units) {
+        SaasUserDocument user;
+        SaasApiKeyDocument key = null;
+        if (rawApiKey != null && !rawApiKey.isBlank()) {
+            String hash = hashKey(rawApiKey.trim());
+            key = apiKeyRepository.findByKeyHash(hash)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid API key"));
+            if (key.isRevoked()) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "API key revoked");
+            }
+            user = userRepository.findById(key.getUserId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found for API key"));
+        } else if (sessionUser != null) {
+            user = userRepository.findById(sessionUser.getId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Please sign in"));
+        } else {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                    "Sign in on the website, or send an API key (X-API-Key) for external use");
         }
-        String hash = hashKey(rawApiKey.trim());
-        SaasApiKeyDocument key = apiKeyRepository.findByKeyHash(hash)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid API key"));
-        if (key.isRevoked()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "API key revoked");
-        }
-        SaasUserDocument user = userRepository.findById(key.getUserId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found for API key"));
         if (!user.isEnabled()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account disabled");
         }
@@ -79,6 +89,10 @@ public class CreditMeteringService {
         return new MeteredCall(user, key, totalCost, overage);
     }
 
+    public MeteredCall authorizeAndPrepare(String rawApiKey, String operation, int units) {
+        return authorizeAndPrepare(rawApiKey, null, operation, units);
+    }
+
     public Map<String, Object> commit(MeteredCall call, String operation, Map<String, Object> metadata) {
         SaasUserDocument user = userRepository.findById(call.user().getId()).orElseThrow();
         Instant now = Instant.now();
@@ -92,13 +106,15 @@ public class CreditMeteringService {
         userRepository.save(user);
 
         SaasApiKeyDocument key = call.apiKey();
-        key.setLastUsedAt(now);
-        key.setHitCount(key.getHitCount() + 1);
-        apiKeyRepository.save(key);
+        if (key != null) {
+            key.setLastUsedAt(now);
+            key.setHitCount(key.getHitCount() + 1);
+            apiKeyRepository.save(key);
+        }
 
         SaasUsageEventDocument event = new SaasUsageEventDocument();
         event.setUserId(user.getId());
-        event.setApiKeyId(key.getId());
+        event.setApiKeyId(key == null ? null : key.getId());
         event.setOperation(operation);
         event.setCreditsCharged(call.cost());
         event.setOverage(call.overage());

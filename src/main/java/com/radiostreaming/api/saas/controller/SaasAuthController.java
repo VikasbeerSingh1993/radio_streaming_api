@@ -3,6 +3,7 @@ package com.radiostreaming.api.saas.controller;
 import com.radiostreaming.api.saas.dto.SaasAccountSettingsRequest;
 import com.radiostreaming.api.saas.dto.SaasLoginRequest;
 import com.radiostreaming.api.saas.dto.SaasRegisterRequest;
+import com.radiostreaming.api.saas.dto.SaasVerifyRegisterRequest;
 import com.radiostreaming.api.saas.security.CurrentSaasUser;
 import com.radiostreaming.api.saas.service.SaasAuthService;
 import jakarta.validation.Valid;
@@ -29,7 +30,17 @@ public class SaasAuthController {
 
     @PostMapping("/register")
     public Map<String, Object> register(@Valid @RequestBody SaasRegisterRequest request) {
-        return authService.register(request);
+        return authService.beginRegistration(request);
+    }
+
+    @PostMapping("/register/verify")
+    public Map<String, Object> verify(@Valid @RequestBody SaasVerifyRegisterRequest request) {
+        return authService.verifyRegistration(request);
+    }
+
+    @PostMapping("/register/resend")
+    public Map<String, Object> resend(@RequestBody Map<String, String> body) {
+        return authService.resendRegistrationOtp(body == null ? null : body.get("email"));
     }
 
     @PostMapping("/login")
