@@ -28,6 +28,10 @@ public class SiteCmsBootstrap {
         putSetting("brand_name", "Divine Bliss", now);
         putSetting("logo_url", "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=200&q=80", now);
         putSetting("header_tagline", "Kirtan · Gurbani · Seva tools", now);
+        putSetting("topbar_right_text", "Waheguru Ji Ka Khalsa · Waheguru Ji Ki Fateh", now);
+        putSetting("topbar_visible", "true", now);
+        putSetting("topbar_left_visible", "true", now);
+        putSetting("topbar_right_visible", "true", now);
         putSetting("footer_text", "Live Kirtan, Gurbani search, and respectful AI tools for sangat and seva.", now);
         putSetting("footer_copyright", "Divine Bliss", now);
         putSetting("nav_home", "Home", now);
@@ -98,7 +102,7 @@ public class SiteCmsBootstrap {
                 now);
         putPage("services",
                 "Our services",
-                "Open listening and scripture tools for everyone. Paid AI tools need an account and plan.",
+                "Open listening and scripture tools for everyone. AI tools need an account and plan.",
                 null,
                 now);
 

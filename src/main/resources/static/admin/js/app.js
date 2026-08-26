@@ -1021,6 +1021,22 @@
         }
         return settings;
       }
+      function applyTopbarDefaults(settings) {
+        if (!settings.header_tagline) {
+          settings.header_tagline = "Kirtan · Gurbani · Seva tools";
+        }
+        if (!settings.topbar_right_text) {
+          settings.topbar_right_text = "Waheguru Ji Ka Khalsa · Waheguru Ji Ki Fateh";
+        }
+        ["topbar_visible", "topbar_left_visible", "topbar_right_visible"].forEach(function (key) {
+          if (settings[key] == null || settings[key] === "") {
+            settings[key] = "true";
+          } else {
+            settings[key] = String(settings[key]);
+          }
+        });
+        return settings;
+      }
       function pickSettings(keys) {
         var body = {};
         keys.forEach(function (key) {
@@ -1033,7 +1049,7 @@
         $scope.formError = "";
         Api.websiteContent().then(function (res) {
           var data = res.data || {};
-          $scope.settings = applyNavDefaults(data.settings || {});
+          $scope.settings = applyTopbarDefaults(applyNavDefaults(data.settings || {}));
           var pagesMap = data.pages || {};
           $scope.pages = Object.keys(pagesMap).sort().map(function (key) {
             var p = pagesMap[key] || {};
@@ -1065,11 +1081,29 @@
       $scope.saveSettings = function () {
         $scope.saving = true;
         $scope.formError = "";
-        Api.saveWebsiteSettings(pickSettings(["brand_name", "logo_url", "header_tagline"])).then(function (res) {
-          $scope.settings = applyNavDefaults(Object.assign({}, $scope.settings, res.data || {}));
+        Api.saveWebsiteSettings(pickSettings(["brand_name", "logo_url"])).then(function (res) {
+          $scope.settings = applyTopbarDefaults(applyNavDefaults(Object.assign({}, $scope.settings, res.data || {})));
           $scope.$root.flash = { text: "Brand and logo saved." };
         }).catch(function (err) {
           flashError($scope, err, "Could not save brand settings.");
+        }).finally(function () {
+          $scope.saving = false;
+        });
+      };
+      $scope.saveTopbar = function () {
+        $scope.saving = true;
+        $scope.formError = "";
+        Api.saveWebsiteSettings(pickSettings([
+          "topbar_visible",
+          "topbar_left_visible",
+          "topbar_right_visible",
+          "header_tagline",
+          "topbar_right_text"
+        ])).then(function (res) {
+          $scope.settings = applyTopbarDefaults(applyNavDefaults(Object.assign({}, $scope.settings, res.data || {})));
+          $scope.$root.flash = { text: "Top announcement bar saved." };
+        }).catch(function (err) {
+          flashError($scope, err, "Could not save top announcement bar.");
         }).finally(function () {
           $scope.saving = false;
         });
@@ -1078,7 +1112,7 @@
         $scope.saving = true;
         $scope.formError = "";
         Api.saveWebsiteSettings(pickSettings(Object.keys(NAV_DEFAULTS))).then(function (res) {
-          $scope.settings = applyNavDefaults(Object.assign({}, $scope.settings, res.data || {}));
+          $scope.settings = applyTopbarDefaults(applyNavDefaults(Object.assign({}, $scope.settings, res.data || {})));
           $scope.$root.flash = { text: "Header menu labels saved." };
         }).catch(function (err) {
           flashError($scope, err, "Could not save header menu labels.");
@@ -1090,7 +1124,7 @@
         $scope.saving = true;
         $scope.formError = "";
         Api.saveWebsiteSettings(pickSettings(["footer_text", "footer_copyright"])).then(function (res) {
-          $scope.settings = applyNavDefaults(Object.assign({}, $scope.settings, res.data || {}));
+          $scope.settings = applyTopbarDefaults(applyNavDefaults(Object.assign({}, $scope.settings, res.data || {})));
           $scope.$root.flash = { text: "Footer saved." };
         }).catch(function (err) {
           flashError($scope, err, "Could not save footer.");

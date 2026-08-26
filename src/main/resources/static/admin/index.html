@@ -599,12 +599,33 @@
             <div class="grid-2">
               <label class="field"><span>Brand name</span><input ng-model="settings.brand_name" placeholder="Divine Bliss"></label>
               <label class="field"><span>Logo image URL</span><input ng-model="settings.logo_url" placeholder="https://..."></label>
-              <label class="field" style="grid-column:1 / -1"><span>Header tagline</span><input ng-model="settings.header_tagline" placeholder="Kirtan · Gurbani · Seva tools"></label>
             </div>
             <div class="muted" ng-if="settings.logo_url" style="margin:12px 0">
               Preview: <img ng-src="{{settings.logo_url}}" alt="" style="height:40px;width:40px;border-radius:50%;object-fit:cover;vertical-align:middle">
             </div>
             <button class="btn btn-primary btn-sm" type="submit" ng-disabled="saving">Save brand &amp; logo</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="accordion-item" ng-class="{open: isOpen('topbar')}">
+        <button type="button" class="accordion-head" ng-click="toggle('topbar')">
+          <span>Top announcement bar</span>
+          <span class="accordion-chevron">{{isOpen('topbar') ? '−' : '+'}}</span>
+        </button>
+        <div class="accordion-body" ng-show="isOpen('topbar')">
+          <p class="muted">Thin bar above the main header. Control visibility and left/right copy.</p>
+          <form novalidate ng-submit="saveTopbar()">
+            <div style="display:flex;flex-wrap:wrap;gap:12px 20px;margin-bottom:14px">
+              <label class="check-pill"><input type="checkbox" ng-model="settings.topbar_visible" ng-true-value="'true'" ng-false-value="'false'"> Show announcement bar</label>
+              <label class="check-pill"><input type="checkbox" ng-model="settings.topbar_left_visible" ng-true-value="'true'" ng-false-value="'false'"> Show left text</label>
+              <label class="check-pill"><input type="checkbox" ng-model="settings.topbar_right_visible" ng-true-value="'true'" ng-false-value="'false'"> Show right text</label>
+            </div>
+            <div class="grid-2">
+              <label class="field" style="grid-column:1 / -1"><span>Left text</span><input ng-model="settings.header_tagline" placeholder="Kirtan · Gurbani · Seva tools"></label>
+              <label class="field" style="grid-column:1 / -1"><span>Right text</span><input ng-model="settings.topbar_right_text" placeholder="Waheguru Ji Ka Khalsa · Waheguru Ji Ki Fateh"></label>
+            </div>
+            <button class="btn btn-primary btn-sm" type="submit" ng-disabled="saving">Save top announcement bar</button>
           </form>
         </div>
       </div>
@@ -615,7 +636,7 @@
           <span class="accordion-chevron">{{isOpen('nav') ? '−' : '+'}}</span>
         </button>
         <div class="accordion-body" ng-show="isOpen('nav')">
-          <p class="muted">Rename links shown in the website header. Use clear Title Case (example: Gurbani AI Search).</p>
+          <p class="muted">Rename links shown in the website header (Home, Services, Live Kirtan &amp; Radio, Gurbani Search, Plans). Extra label keys below are kept for page titles elsewhere and are not shown in the slim header.</p>
           <form novalidate ng-submit="saveNavLabels()">
             <div class="grid-2">
               <label class="field" ng-repeat="item in navItems">
