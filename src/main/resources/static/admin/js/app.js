@@ -922,7 +922,7 @@
       var typeLabels = {
         GMAIL: { username: "Gmail Username", password: "App Password" },
         MONGO: { username: "Mongo Username", password: "Mongo Password" },
-        MYSQL: { username: "MySQL Username", password: "MySQL Password", host: "MySQL Host", port: "MySQL Port", database: "Database Name" }
+        MYSQL: { username: "MySQL Username", password: "MySQL Password", host: "MySQL Host", port: "MySQL Port", database: "Database Name", useSsl: "Use SSL" }
       };
       var placeholders = {
         GMAIL: {
@@ -954,11 +954,12 @@
           srv: "true"
         },
         MYSQL: {
-          host: "e.g. mysql.example.com or Railway private host",
+          host: "e.g. 129.225.124.207",
           port: "e.g. 3306",
-          username: "e.g. bani_user",
+          username: "MySQL username for bani_search",
           password: "Leave blank to keep the saved password",
-          database: "bani_search"
+          database: "bani_search",
+          useSsl: "false"
         }
       };
       $scope.items = [];

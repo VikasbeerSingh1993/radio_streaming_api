@@ -198,6 +198,49 @@ public class CredentialService {
         log.info("Seeded {} credentials into MongoDB", normalize(type));
     }
 
+    /**
+     * Ensures MYSQL (or similar) row exists with host/username/password/database.
+     * Fills blank fields from defaults; password is encrypted via {@link #saveMasked}.
+     */
+    public void seedOrFillIncomplete(String type, Map<String, String> defaults) {
+        CredentialDocument existing = repository.findByTypeIgnoreCase(type).orElse(null);
+        if (existing == null) {
+            saveMasked(type, defaults);
+            log.info("Seeded {} credentials into MongoDB", normalize(type));
+            return;
+        }
+        Map<String, String> current = existing.getFields() == null
+                ? new LinkedHashMap<>()
+                : new LinkedHashMap<>(existing.getFields());
+        Map<String, String> decrypted = new LinkedHashMap<>();
+        current.forEach((key, value) ->
+                decrypted.put(key, isSecretKey(key) ? crypto.decrypt(value) : value));
+        if (TYPE_MYSQL.equals(normalize(type)) && MysqlConnectionFields.isComplete(decrypted)) {
+            if (!current.containsKey("useSsl")) {
+                decrypted.putIfAbsent("useSsl", MysqlConnectionFields.DEFAULT_USE_SSL);
+                saveMasked(type, decrypted);
+            }
+            return;
+        }
+        if (TYPE_MYSQL.equals(normalize(type))) {
+            Map<String, String> filled = MysqlConnectionFields.mergeWithDefaults(decrypted);
+            saveMasked(type, filled);
+            log.info("Filled incomplete {} credentials in MongoDB", normalize(type));
+            return;
+        }
+        boolean incomplete = decrypted.values().stream().anyMatch(v -> v == null || v.isBlank());
+        if (incomplete && defaults != null) {
+            Map<String, String> filled = new LinkedHashMap<>(defaults);
+            decrypted.forEach((k, v) -> {
+                if (v != null && !v.isBlank()) {
+                    filled.put(k, v);
+                }
+            });
+            saveMasked(type, filled);
+            log.info("Filled incomplete {} credentials in MongoDB", normalize(type));
+        }
+    }
+
     private CredentialDocument require(String type) {
         return find(type).orElseThrow(() -> new ResponseStatusException(
                 HttpStatus.NOT_FOUND, "No credentials stored for type " + type));
@@ -250,6 +293,7 @@ public class CredentialService {
             fields.putIfAbsent("username", "");
             fields.putIfAbsent("password", "");
             fields.putIfAbsent("database", "bani_search");
+            fields.putIfAbsent("useSsl", "false");
         }
         view.put("fields", fields);
         return view;

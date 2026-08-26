@@ -1,6 +1,7 @@
 package com.radiostreaming.api.config;
 
 import com.radiostreaming.api.service.CredentialCrypto;
+import com.radiostreaming.api.service.MysqlConnectionFields;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.bson.Document;
@@ -13,13 +14,16 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import javax.sql.DataSource;
+import java.sql.Connection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Singleton MySQL DataSource for {@code bani_search} (HikariCP one pool).
- * Credentials: {@code app_credentials} type MYSQL, else {@code app.mysql.*} / env bootstrap.
+ * Singleton HikariCP DataSource for Gurbani MySQL {@code bani_search} only.
+ * Stations / events / audio catalog stay on MongoDB.
+ * Prefers encrypted {@code app_credentials} type MYSQL; bootstrap defaults fill gaps
+ * so the first boot can connect before ApplicationReady seeds the table.
  */
 @Configuration
 public class MysqlConfig {
@@ -31,38 +35,76 @@ public class MysqlConfig {
             MongoTemplate mongoTemplate,
             CredentialCrypto crypto,
             @Value("${app.mysql.host:}") String envHost,
-            @Value("${app.mysql.port:3306}") int envPort,
+            @Value("${app.mysql.port:}") String envPort,
             @Value("${app.mysql.username:}") String envUsername,
             @Value("${app.mysql.password:}") String envPassword,
-            @Value("${app.mysql.database:bani_search}") String envDatabase) {
-        Map<String, String> fields = loadMysqlFields(mongoTemplate, crypto);
-        String host = firstNonBlank(fields.get("host"), envHost, "127.0.0.1");
-        int port = parsePort(firstNonBlank(fields.get("port"), String.valueOf(envPort)), envPort);
-        String username = firstNonBlank(fields.get("username"), envUsername);
-        String password = firstNonBlank(fields.get("password"), envPassword);
-        String database = firstNonBlank(fields.get("database"), envDatabase, "bani_search");
+            @Value("${app.mysql.database:}") String envDatabase,
+            @Value("${app.mysql.use-ssl:}") String envUseSsl) {
+        Map<String, String> fromTable = loadMysqlFields(mongoTemplate, crypto);
+        Map<String, String> fromEnv = new LinkedHashMap<>();
+        putIfPresent(fromEnv, "host", envHost);
+        putIfPresent(fromEnv, "port", envPort);
+        putIfPresent(fromEnv, "username", envUsername);
+        putIfPresent(fromEnv, "password", envPassword);
+        putIfPresent(fromEnv, "database", envDatabase);
+        putIfPresent(fromEnv, "useSsl", envUseSsl);
+
+        Map<String, String> merged;
+        String source;
+        if (MysqlConnectionFields.isComplete(fromTable)) {
+            merged = MysqlConnectionFields.mergeWithDefaults(fromTable);
+            source = "app_credentials";
+        } else if (!fromEnv.isEmpty()) {
+            merged = MysqlConnectionFields.mergeWithDefaults(fromEnv);
+            source = "env+defaults";
+        } else {
+            merged = MysqlConnectionFields.defaults();
+            source = "bootstrap-defaults";
+        }
+
+        String host = merged.get("host");
+        int port = parsePort(merged.get("port"), 3306);
+        String username = merged.get("username");
+        String password = merged.get("password");
+        String database = firstNonBlank(merged.get("database"), MysqlConnectionFields.DEFAULT_DATABASE);
+        boolean useSsl = Boolean.parseBoolean(merged.getOrDefault("useSsl", "false"));
 
         HikariConfig config = new HikariConfig();
         config.setPoolName("bani-search-mysql");
         config.setJdbcUrl("jdbc:mysql://" + host + ":" + port + "/" + database
                 + "?useUnicode=true&characterEncoding=utf8&connectionCollation=utf8mb4_0900_ai_ci"
-                + "&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false");
+                + "&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=" + useSsl);
         config.setUsername(username);
         config.setPassword(password == null ? "" : password);
         config.setMaximumPoolSize(10);
         config.setMinimumIdle(1);
-        config.setConnectionTimeout(15_000);
+        config.setConnectionTimeout(12_000);
         config.setInitializationFailTimeout(-1);
         config.setDriverClassName("com.mysql.cj.jdbc.Driver");
 
         HikariDataSource dataSource = new HikariDataSource(config);
-        log.info("Created singleton MySQL DataSource for database '{}' at {}:{}", database, host, port);
+        log.info("Created singleton MySQL DataSource for Gurbani DB '{}' at {}:{} (source={})",
+                database, host, port, source);
+        pingQuietly(dataSource, host, port, database);
         return dataSource;
     }
 
     @Bean
     public JdbcTemplate jdbcTemplate(DataSource dataSource) {
         return new JdbcTemplate(dataSource);
+    }
+
+    private static void pingQuietly(HikariDataSource dataSource, String host, int port, String database) {
+        try (Connection connection = dataSource.getConnection();
+             var statement = connection.createStatement();
+             var rs = statement.executeQuery("SELECT 1")) {
+            if (rs.next()) {
+                log.info("MySQL connectivity OK for {} at {}:{}", database, host, port);
+            }
+        } catch (Exception ex) {
+            log.warn("MySQL not reachable at {}:{} — Gurbani search will degrade. {}",
+                    host, port, ex.getMessage());
+        }
     }
 
     private static Map<String, String> loadMysqlFields(MongoTemplate mongoTemplate, CredentialCrypto crypto) {
@@ -84,9 +126,15 @@ public class MysqlConfig {
                 fields.put("password", crypto.decrypt(fields.get("password")));
             }
         } catch (Exception ex) {
-            log.warn("Could not load MYSQL credentials from app_credentials; using env bootstrap", ex);
+            log.warn("Could not load MYSQL credentials from app_credentials; using bootstrap defaults", ex);
         }
         return fields;
+    }
+
+    private static void putIfPresent(Map<String, String> target, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            target.put(key, value.trim());
+        }
     }
 
     private static String firstNonBlank(String... values) {

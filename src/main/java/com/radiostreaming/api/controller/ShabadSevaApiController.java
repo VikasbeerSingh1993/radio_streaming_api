@@ -18,7 +18,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Shabad Seva Gurbani + AI contracts. Search reads MySQL {@code bani_search};
+ * Shabad Seva Gurbani + AI contracts.
+ * Gurbani search / ang / shabad / sources read MySQL {@code bani_search} only.
+ * Stations, events, and audio catalog remain on MongoDB (see RadioApiController).
  * AI/voice/live-attach endpoints are stubs until ASR is wired server-side.
  */
 @RestController

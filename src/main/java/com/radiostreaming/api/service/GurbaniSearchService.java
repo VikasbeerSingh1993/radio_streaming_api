@@ -20,8 +20,8 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Gurbani search against {@code bani_search.search_documents} (BaniDB schema).
- * Modes: {@code word} (FULLTEXT) and {@code prefix} (starting-word / first-akhar style).
+ * Gurbani search against MySQL {@code bani_search.search_documents} only (BaniDB schema).
+ * Does not use MongoDB. Modes: {@code word} (FULLTEXT) and {@code prefix} (starting-word).
  */
 @Service
 public class GurbaniSearchService {

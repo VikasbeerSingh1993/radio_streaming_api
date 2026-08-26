@@ -23,16 +23,18 @@ public class CredentialBootstrap {
     private final String mysqlUsername;
     private final String mysqlPassword;
     private final String mysqlDatabase;
+    private final String mysqlUseSsl;
 
     public CredentialBootstrap(
             CredentialService credentialService,
             @Value("${spring.data.mongodb.uri}") String mongoUri,
             @Value("${spring.data.mongodb.database:divine_bliss_streaming}") String mongoDatabase,
             @Value("${app.mysql.host:}") String mysqlHost,
-            @Value("${app.mysql.port:3306}") String mysqlPort,
+            @Value("${app.mysql.port:}") String mysqlPort,
             @Value("${app.mysql.username:}") String mysqlUsername,
             @Value("${app.mysql.password:}") String mysqlPassword,
-            @Value("${app.mysql.database:bani_search}") String mysqlDatabase) {
+            @Value("${app.mysql.database:}") String mysqlDatabase,
+            @Value("${app.mysql.use-ssl:}") String mysqlUseSsl) {
         this.credentialService = credentialService;
         this.mongoUri = mongoUri;
         this.mongoDatabase = mongoDatabase;
@@ -41,6 +43,7 @@ public class CredentialBootstrap {
         this.mysqlUsername = mysqlUsername;
         this.mysqlPassword = mysqlPassword;
         this.mysqlDatabase = mysqlDatabase;
+        this.mysqlUseSsl = mysqlUseSsl;
     }
 
     @Order(0)
@@ -52,20 +55,34 @@ public class CredentialBootstrap {
             credentialService.seedIfMissing(CredentialService.TYPE_GEO, geoFields());
             credentialService.ensurePhotonProvider();
             credentialService.seedIfMissing(CredentialService.TYPE_MONGO, mongoFields());
-            credentialService.seedIfMissing(CredentialService.TYPE_MYSQL, mysqlFields());
+            // Gurbani MySQL only — stations remain on Mongo
+            credentialService.seedOrFillIncomplete(CredentialService.TYPE_MYSQL, mysqlFields());
         } catch (Exception ex) {
             log.warn("Could not seed app credentials; they can be added from admin Settings", ex);
         }
     }
 
     private Map<String, String> mysqlFields() {
-        Map<String, String> fields = new LinkedHashMap<>();
-        fields.put("host", mysqlHost == null || mysqlHost.isBlank() ? "127.0.0.1" : mysqlHost.trim());
-        fields.put("port", mysqlPort == null || mysqlPort.isBlank() ? "3306" : mysqlPort.trim());
-        fields.put("username", mysqlUsername == null ? "" : mysqlUsername.trim());
-        fields.put("password", mysqlPassword == null ? "" : mysqlPassword);
-        fields.put("database", mysqlDatabase == null || mysqlDatabase.isBlank() ? "bani_search" : mysqlDatabase.trim());
-        return fields;
+        Map<String, String> fromEnv = new LinkedHashMap<>();
+        if (mysqlHost != null && !mysqlHost.isBlank()) {
+            fromEnv.put("host", mysqlHost.trim());
+        }
+        if (mysqlPort != null && !mysqlPort.isBlank()) {
+            fromEnv.put("port", mysqlPort.trim());
+        }
+        if (mysqlUsername != null && !mysqlUsername.isBlank()) {
+            fromEnv.put("username", mysqlUsername.trim());
+        }
+        if (mysqlPassword != null && !mysqlPassword.isBlank()) {
+            fromEnv.put("password", mysqlPassword);
+        }
+        if (mysqlDatabase != null && !mysqlDatabase.isBlank()) {
+            fromEnv.put("database", mysqlDatabase.trim());
+        }
+        if (mysqlUseSsl != null && !mysqlUseSsl.isBlank()) {
+            fromEnv.put("useSsl", mysqlUseSsl.trim());
+        }
+        return MysqlConnectionFields.mergeWithDefaults(fromEnv);
     }
 
     private Map<String, String> mongoFields() {
