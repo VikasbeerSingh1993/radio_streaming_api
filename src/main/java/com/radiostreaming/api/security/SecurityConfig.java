@@ -1,5 +1,6 @@
 package com.radiostreaming.api.security;
 
+import com.radiostreaming.api.saas.repository.SaasUserRepository;
 import com.radiostreaming.api.service.AdminDirectory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,8 +19,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     @Bean
-    public JwtAuthenticationFilter jwtAuthenticationFilter(JwtService jwtService, AdminDirectory adminDirectory) {
-        return new JwtAuthenticationFilter(jwtService, adminDirectory);
+    public JwtAuthenticationFilter jwtAuthenticationFilter(
+            JwtService jwtService,
+            AdminDirectory adminDirectory,
+            SaasUserRepository saasUserRepository) {
+        return new JwtAuthenticationFilter(jwtService, adminDirectory, saasUserRepository);
     }
 
     @Bean

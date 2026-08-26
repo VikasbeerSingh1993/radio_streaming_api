@@ -1,6 +1,9 @@
 package com.radiostreaming.api.security;
 
 import com.radiostreaming.api.model.AdminUser;
+import com.radiostreaming.api.saas.model.SaasUserDocument;
+import com.radiostreaming.api.saas.repository.SaasUserRepository;
+import com.radiostreaming.api.saas.security.SaasPrincipal;
 import com.radiostreaming.api.service.AdminDirectory;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -23,10 +26,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final AdminDirectory adminDirectory;
+    private final SaasUserRepository saasUserRepository;
 
-    public JwtAuthenticationFilter(JwtService jwtService, AdminDirectory adminDirectory) {
+    public JwtAuthenticationFilter(
+            JwtService jwtService,
+            AdminDirectory adminDirectory,
+            SaasUserRepository saasUserRepository) {
         this.jwtService = jwtService;
         this.adminDirectory = adminDirectory;
+        this.saasUserRepository = saasUserRepository;
     }
 
     @Override
@@ -40,19 +48,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (!token.isEmpty()) {
                 try {
                     Claims claims = jwtService.parse(token);
-                    String username = claims.getSubject();
-                    AdminUser user = adminDirectory.find(username).orElse(null);
-                    if (user != null && user.isEnabledAccount()) {
-                        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
-                        authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
-                        if (user.isSuperAdmin()) {
-                            authorities.add(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
-                        }
-                        UsernamePasswordAuthenticationToken authentication =
-                                new UsernamePasswordAuthenticationToken(username, null, authorities);
-                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    String subject = claims.getSubject();
+                    String role = claims.get("role", String.class);
+                    if (role != null && role.startsWith("SAAS_")) {
+                        authenticateSaas(subject, role);
                     } else {
-                        SecurityContextHolder.clearContext();
+                        authenticateAdmin(subject);
                     }
                 } catch (JwtException | IllegalArgumentException ignored) {
                     SecurityContextHolder.clearContext();
@@ -60,5 +61,39 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         }
         filterChain.doFilter(request, response);
+    }
+
+    private void authenticateAdmin(String username) {
+        AdminUser user = adminDirectory.find(username).orElse(null);
+        if (user != null && user.isEnabledAccount()) {
+            List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+            authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
+            if (user.isSuperAdmin()) {
+                authorities.add(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
+            }
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(username, null, authorities);
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+        } else {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    private void authenticateSaas(String email, String role) {
+        SaasUserDocument user = saasUserRepository.findByEmailIgnoreCase(email).orElse(null);
+        if (user == null || !user.isEnabled()) {
+            SecurityContextHolder.clearContext();
+            return;
+        }
+        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+        authorities.add(new SimpleGrantedAuthority("ROLE_SAAS_USER"));
+        if ("SAAS_ADMIN".equalsIgnoreCase(user.getRole()) || "SAAS_ADMIN".equalsIgnoreCase(role)
+                || "SAAS_SAAS_ADMIN".equalsIgnoreCase(role)) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_SAAS_ADMIN"));
+        }
+        SaasPrincipal principal = new SaasPrincipal(user, null, "jwt");
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(principal, null, authorities);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
     }
 }
