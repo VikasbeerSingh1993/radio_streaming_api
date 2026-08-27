@@ -31,4 +31,9 @@ sudo chown -R mongodb:mongodb /var/lib/mongodb /var/log/mongodb
 echo "==> Building the application (dependencies + jar). Tests run in CI via 'mvn test'."
 mvn -B -DskipTests package
 
+# Leave MySQL/MongoDB stopped so a build snapshot never captures a live (and, on
+# overlayfs, unrecoverable) datadir. start.sh brings the services up per boot.
+echo "==> Stopping datastores so the snapshot captures a clean state"
+sudo service mysql stop 2>/dev/null || true
+
 echo "==> Install complete."

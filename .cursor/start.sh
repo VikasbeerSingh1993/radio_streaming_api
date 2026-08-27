@@ -13,11 +13,27 @@ if ! pgrep -x mongod >/dev/null 2>&1; then
 fi
 
 echo "==> Starting MySQL"
-sudo service mysql start || true
-for _ in $(seq 1 30); do
-  if sudo mysqladmin ping >/dev/null 2>&1; then break; fi
-  sleep 1
-done
+mysql_up() {
+  for _ in $(seq 1 30); do
+    if sudo mysqladmin ping >/dev/null 2>&1; then return 0; fi
+    sleep 1
+  done
+  return 1
+}
+
+sudo service mysql start 2>/dev/null || true
+if ! mysql_up; then
+  # A snapshot can capture an unclean MySQL datadir that InnoDB cannot recover on
+  # overlayfs. For a throwaway dev environment it is safe to re-initialize it.
+  echo "   MySQL did not come up; re-initializing a fresh datadir"
+  sudo service mysql stop 2>/dev/null || true
+  sudo mv /var/lib/mysql "/var/lib/mysql.broken.$(date +%s)" 2>/dev/null || sudo rm -rf /var/lib/mysql
+  sudo mkdir -p /var/lib/mysql
+  sudo chown mysql:mysql /var/lib/mysql
+  sudo mysqld --initialize-insecure --user=mysql --datadir=/var/lib/mysql
+  sudo service mysql start 2>/dev/null || true
+  mysql_up || { echo "   ERROR: MySQL still not reachable"; exit 1; }
+fi
 
 echo "==> Ensuring local MySQL databases and dev user"
 # The SaaS/CMS/Gurbani layer needs MySQL. These are throwaway local dev credentials.
