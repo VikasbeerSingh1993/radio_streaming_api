@@ -32,7 +32,7 @@ public class SiteCmsBootstrap {
         putSetting("topbar_visible", "true", now);
         putSetting("topbar_left_visible", "true", now);
         putSetting("topbar_right_visible", "true", now);
-        putSetting("footer_text", "Live Kirtan, Gurbani search, and respectful AI tools for sangat and seva.", now);
+        putSetting("footer_text", "Live Kirtan, Gurbani search, and practical tools for sangat and seva.", now);
         putSetting("footer_copyright", "Divine Bliss", now);
         putSetting("nav_home", "Home", now);
         putSetting("nav_services", "Services", now);
@@ -41,7 +41,7 @@ public class SiteCmsBootstrap {
         putSetting("nav_gurbani_ai", "Gurbani AI Search", now);
         putSetting("nav_history", "Sikh History", now);
         putSetting("nav_ocr", "Punjabi OCR", now);
-        putSetting("nav_ai_images", "AI Images", now);
+        putSetting("nav_ai_images", "Sikhism AI Images", now);
         putSetting("nav_plans", "Plans", now);
 
         putPage("home",
@@ -50,8 +50,8 @@ public class SiteCmsBootstrap {
                 "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=1600&q=80",
                 now);
         putPage("plans",
-                "Choose a plan that fits your seva",
-                "Credits cover Punjabi OCR, AI images, Sikh History AI, and Gurbani AI Search (voice).",
+                "Choose a plan",
+                "Start with the AI Free tier at ₹100 per month for Sikh History, Punjabi OCR, Sikhism AI Images, and Gurbani AI Search. Upgrade for higher daily limits.",
                 null,
                 now);
         putPage("radio",
@@ -65,13 +65,13 @@ public class SiteCmsBootstrap {
                 null,
                 now);
         putPage("history",
-                "Sikh History AI",
-                "Ask clear questions about the Gurus, sakhis, and Sikh heritage. Uses plan credits.",
+                "Sikh History",
+                "Ask about the Gurus, sakhis, and Sikh heritage. Each question uses credits from your plan.",
                 null,
                 now);
         putPage("gurbani-ai",
                 "Gurbani AI Search",
-                "Use voice or live kirtan audio to find lines in the Gurbani database. Uses plan credits.",
+                "Use your voice, or audio from live kirtan, to find matching lines in the Gurbani database. Each search uses plan credits.",
                 null,
                 now);
         // Refresh copy if an older Q&A subtitle was seeded earlier
@@ -81,7 +81,7 @@ public class SiteCmsBootstrap {
                   AND (subtitle LIKE '%natural questions%' OR subtitle LIKE '%Q&A%' OR title = 'Gurbani AI')
                 """,
                 "Gurbani AI Search",
-                "Use voice or live kirtan audio to find lines in the Gurbani database. Uses plan credits.",
+                "Use your voice, or audio from live kirtan, to find matching lines in the Gurbani database. Each search uses plan credits.",
                 Timestamp.from(now));
         jdbc.update("""
                 UPDATE site_settings SET setting_value = ?, updated_at = ?
@@ -92,24 +92,95 @@ public class SiteCmsBootstrap {
 
         putPage("ocr",
                 "Punjabi OCR",
-                "Upload a photo of Gurmukhi text and read it on screen. Uses plan credits.",
+                "Upload a photo of Gurmukhi text and read it on screen. Each scan uses plan credits.",
                 null,
                 now);
         putPage("ai-images",
-                "AI Images",
-                "Create respectful Sikh-inspired artwork from a short description. Uses plan credits.",
+                "Sikhism AI Images",
+                "Describe a respectful scene and generate Sikh-inspired artwork. Each image uses plan credits.",
                 null,
                 now);
         putPage("services",
-                "Our services",
-                "Open listening and scripture tools for everyone. AI tools need an account and plan.",
+                "Services",
+                "Listen and search freely. Sign in and choose a plan when you need OCR, AI images, or voice search.",
                 null,
                 now);
 
         putMedia("home_hero", "Home hero", "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=1600&q=80", "/", 1, now);
         putMedia("home_feature_1", "Live Kirtan", "https://images.unsplash.com/photo-1548013146-72479768bada?auto=format&fit=crop&w=800&q=80", "/radio", 2, now);
         putMedia("home_feature_2", "Gurbani", "https://images.unsplash.com/photo-1606983340126-99ab4feaa64a?auto=format&fit=crop&w=800&q=80", "/gurbani", 3, now);
-        putMedia("home_feature_3", "Seva tools", "https://images.unsplash.com/photo-1456513080080-7e9aa9d2c4a5?auto=format&fit=crop&w=800&q=80", "/services", 4, now);
+        putMedia("home_feature_3", "Tools for seva", "https://images.unsplash.com/photo-1456513080080-7e9aa9d2c4a5?auto=format&fit=crop&w=800&q=80", "/services", 4, now);
+
+        refreshStaleCopy(now);
+    }
+
+    private void refreshStaleCopy(Instant now) {
+        jdbc.update("""
+                UPDATE site_pages SET title = ?, subtitle = ?, updated_at = ?
+                WHERE page_key = 'services'
+                  AND (title = 'Our services'
+                    OR subtitle LIKE '%AI tools need%'
+                    OR subtitle LIKE '%Subscription required%')
+                """,
+                "Services",
+                "Listen and search freely. Sign in and choose a plan when you need OCR, AI images, or voice search.",
+                Timestamp.from(now));
+
+        jdbc.update("""
+                UPDATE site_pages SET title = ?, subtitle = ?, updated_at = ?
+                WHERE page_key = 'history' AND title = 'Sikh History AI'
+                """,
+                "Sikh History",
+                "Ask about the Gurus, sakhis, and Sikh heritage. Each question uses credits from your plan.",
+                Timestamp.from(now));
+
+        jdbc.update("""
+                UPDATE site_pages SET title = ?, subtitle = ?, updated_at = ?
+                WHERE page_key = 'ai-images'
+                  AND (title = 'AI Images' OR subtitle LIKE '%Uses plan credits%')
+                """,
+                "Sikhism AI Images",
+                "Describe a respectful scene and generate Sikh-inspired artwork. Each image uses plan credits.",
+                Timestamp.from(now));
+
+        jdbc.update("""
+                UPDATE site_pages SET title = ?, subtitle = ?, updated_at = ?
+                WHERE page_key = 'plans'
+                  AND (title LIKE '%subscription%' OR subtitle LIKE '%Start with AI Free Tier%'
+                    OR subtitle LIKE '%Credits cover%')
+                """,
+                "Choose a plan",
+                "Start with the AI Free tier at ₹100 per month for Sikh History, Punjabi OCR, Sikhism AI Images, and Gurbani AI Search. Upgrade for higher daily limits.",
+                Timestamp.from(now));
+
+        jdbc.update("""
+                UPDATE site_pages SET subtitle = ?, updated_at = ?
+                WHERE page_key = 'ocr' AND subtitle LIKE '%Uses plan credits%'
+                """,
+                "Upload a photo of Gurmukhi text and read it on screen. Each scan uses plan credits.",
+                Timestamp.from(now));
+
+        jdbc.update("""
+                UPDATE site_pages SET subtitle = ?, updated_at = ?
+                WHERE page_key = 'gurbani-ai'
+                  AND (subtitle LIKE '%Uses plan credits%' OR subtitle LIKE '%Use voice or live kirtan audio%')
+                """,
+                "Use your voice, or audio from live kirtan, to find matching lines in the Gurbani database. Each search uses plan credits.",
+                Timestamp.from(now));
+
+        jdbc.update("""
+                UPDATE site_settings SET setting_value = ?, updated_at = ?
+                WHERE setting_key = 'footer_text'
+                  AND setting_value LIKE '%respectful AI tools%'
+                """,
+                "Live Kirtan, Gurbani search, and practical tools for sangat and seva.",
+                Timestamp.from(now));
+
+        jdbc.update("""
+                UPDATE site_settings SET setting_value = ?, updated_at = ?
+                WHERE setting_key = 'nav_ai_images' AND setting_value = 'AI Images'
+                """,
+                "Sikhism AI Images", Timestamp.from(now));
     }
 
     private void putSetting(String key, String value, Instant now) {
