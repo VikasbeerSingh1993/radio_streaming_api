@@ -1,0 +1,11 @@
+{
+  "name": "Radio Streaming API",
+  "install": "bash .cursor/install.sh",
+  "start": "bash .cursor/start.sh",
+  "terminals": [
+    {
+      "name": "radio-api",
+      "command": "bash .cursor/run-app.sh"
+    }
+  ]
+}
