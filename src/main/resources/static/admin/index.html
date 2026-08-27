@@ -310,8 +310,16 @@
             <select ng-model="form.type" ng-options="type.code as type.name for type in stationTypes">
             </select>
           </label>
-          <label class="field"><span>Thumbnail URL</span><input ng-model="form.thumbnail" placeholder="e.g. https://example.com/station-cover.jpg"></label>
+          <label class="field"><span>Thumbnail URL</span><input ng-model="form.thumbnail" placeholder="Paste URL or upload below"></label>
+          <label class="field">
+            <span>Upload cover image (B2)</span>
+            <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="angular.element(this).scope().uploadThumbnail(this.files); this.value='';">
+            <span class="muted" style="font-size:12px;margin-top:4px" ng-show="uploadBusy">Uploading to storage…</span>
+          </label>
           <label class="check-pill" style="align-self:end;margin-bottom:14px"><input type="checkbox" ng-model="form.live"> Live Station</label>
+        </div>
+        <div class="thumb-preview" ng-if="form.thumbnail" style="margin:0 0 12px">
+          <img ng-src="{{form.thumbnail}}" alt="" style="max-height:96px;border-radius:8px;object-fit:cover">
         </div>
         <div class="modal-actions">
           <button class="btn btn-ghost btn-sm" type="button" ng-click="closeForm()" ng-disabled="saving">Cancel</button>
@@ -379,6 +387,15 @@
             <select ng-model="form.icon" ng-options="icon.value as icon.label for icon in iconOptions">
             </select>
           </label>
+          <label class="field"><span>Thumbnail URL</span><input ng-model="form.thumbnail" placeholder="Paste URL or upload below"></label>
+          <label class="field">
+            <span>Upload cover image (B2)</span>
+            <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="angular.element(this).scope().uploadThumbnail(this.files); this.value='';">
+            <span class="muted" style="font-size:12px;margin-top:4px" ng-show="uploadBusy">Uploading to storage…</span>
+          </label>
+        </div>
+        <div class="thumb-preview" ng-if="form.thumbnail" style="margin:0 0 12px">
+          <img ng-src="{{form.thumbnail}}" alt="" style="max-height:96px;border-radius:8px;object-fit:cover">
         </div>
         <div class="modal-actions">
           <button class="btn btn-ghost btn-sm" type="button" ng-click="closeForm()" ng-disabled="saving">Cancel</button>
