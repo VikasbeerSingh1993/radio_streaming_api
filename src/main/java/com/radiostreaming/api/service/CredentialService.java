@@ -175,7 +175,15 @@ public class CredentialService {
     }
 
     public Optional<JavaMailSender> mailSender() {
-        return find(TYPE_GMAIL).map(this::toMailSender);
+        return find(TYPE_GMAIL)
+                .filter(this::hasUsableMailFields)
+                .map(this::toMailSender);
+    }
+
+    public boolean isMailConfigured() {
+        return mailSender().isPresent()
+                && mailFrom() != null
+                && !mailFrom().isBlank();
     }
 
     public String mailFrom() {
@@ -275,7 +283,21 @@ public class CredentialService {
         props.put("mail.smtp.auth", fields.getOrDefault("auth", "true"));
         props.put("mail.smtp.starttls.enable", fields.getOrDefault("starttls", "true"));
         props.put("mail.smtp.starttls.required", "true");
+        props.put("mail.smtp.ssl.trust", host);
+        props.put("mail.smtp.connectiontimeout", "15000");
+        props.put("mail.smtp.timeout", "15000");
+        props.put("mail.smtp.writetimeout", "15000");
         return sender;
+    }
+
+    private boolean hasUsableMailFields(CredentialDocument document) {
+        if (document.getFields() == null) {
+            return false;
+        }
+        Map<String, String> fields = document.getFields();
+        String username = fields.getOrDefault("username", "").trim();
+        String password = crypto.decrypt(fields.get("password"));
+        return !username.isBlank() && password != null && !password.isBlank();
     }
 
     private Map<String, Object> maskedView(CredentialDocument document) {

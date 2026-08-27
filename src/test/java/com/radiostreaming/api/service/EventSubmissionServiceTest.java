@@ -32,16 +32,18 @@ class EventSubmissionServiceTest {
     @Mock
     private AdminCatalogService catalogService;
     @Mock
-    private CredentialService credentialService;
+    private MailDeliveryService mailDeliveryService;
 
     private EventSubmissionService service;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
     @BeforeEach
     void setUp() {
-        when(credentialService.mailSender()).thenReturn(java.util.Optional.empty());
         service = new EventSubmissionService(
-                repository, catalogService, encoder, credentialService, true);
+                repository, catalogService, encoder, mailDeliveryService);
+    }
+
+    private void stubRepositorySave() {
         when(repository.save(any(EventSubmissionDocument.class))).thenAnswer(invocation -> {
             EventSubmissionDocument doc = invocation.getArgument(0);
             if (doc.getId() == null) {
@@ -53,6 +55,7 @@ class EventSubmissionServiceTest {
 
     @Test
     void startStoresHashedOtpAndMasksEmail() {
+        stubRepositorySave();
         EventSubmitRequest request = baseRequest();
         var body = service.start(request);
 

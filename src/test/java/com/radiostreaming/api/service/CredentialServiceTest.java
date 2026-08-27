@@ -93,6 +93,18 @@ class CredentialServiceTest {
     }
 
     @Test
+    void mailSenderRequiresUsernameAndPassword() {
+        service.seedIfMissing("GMAIL", Map.of(
+                "host", "smtp.gmail.com",
+                "port", "587",
+                "username", "user@gmail.com",
+                "password", "plain-password",
+                "from", "user@gmail.com"
+        ));
+        assertTrue(service.isMailConfigured());
+    }
+
+    @Test
     void seedEncryptsMongoPassword() {
         service.seedIfMissing("MONGO", Map.of(
                 "username", "atlasUser",

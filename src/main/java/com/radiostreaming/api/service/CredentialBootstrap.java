@@ -36,6 +36,7 @@ public class CredentialBootstrap {
     public void seedSharedCredentials() {
         try {
             credentialService.seedIfMissing(CredentialService.TYPE_GMAIL, CentralCredentialCatalog.gmail());
+            credentialService.seedOrFillIncomplete(CredentialService.TYPE_GMAIL, CentralCredentialCatalog.gmail());
             credentialService.seedIfMissing(CredentialService.TYPE_B2, CentralCredentialCatalog.backblazeB2());
             credentialService.seedIfMissing(CredentialService.TYPE_GEO, CentralCredentialCatalog.geo());
             credentialService.ensurePhotonProvider();

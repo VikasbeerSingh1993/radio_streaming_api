@@ -4,14 +4,9 @@ import com.radiostreaming.api.dto.EventSubmitRequest;
 import com.radiostreaming.api.model.EventDocument;
 import com.radiostreaming.api.model.EventSubmissionDocument;
 import com.radiostreaming.api.repository.EventSubmissionRepository;
-import jakarta.mail.internet.InternetAddress;
-import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -36,21 +31,18 @@ public class EventSubmissionService {
     private final EventSubmissionRepository submissionRepository;
     private final AdminCatalogService adminCatalogService;
     private final PasswordEncoder passwordEncoder;
-    private final CredentialService credentialService;
-    private final boolean logOtp;
+    private final MailDeliveryService mailDeliveryService;
     private final SecureRandom random = new SecureRandom();
 
     public EventSubmissionService(
             EventSubmissionRepository submissionRepository,
             AdminCatalogService adminCatalogService,
             PasswordEncoder passwordEncoder,
-            CredentialService credentialService,
-            @Value("${app.mail.log-otp:false}") boolean logOtp) {
+            MailDeliveryService mailDeliveryService) {
         this.submissionRepository = submissionRepository;
         this.adminCatalogService = adminCatalogService;
         this.passwordEncoder = passwordEncoder;
-        this.credentialService = credentialService;
-        this.logOtp = logOtp;
+        this.mailDeliveryService = mailDeliveryService;
     }
 
     public Map<String, Object> start(EventSubmitRequest request) {
@@ -131,39 +123,12 @@ public class EventSubmissionService {
     }
 
     private void deliverOtp(String email, String username, String otp) {
-        JavaMailSender sender = credentialService.mailSender().orElse(null);
-        if (sender == null) {
-            if (logOtp) {
-                log.info("GMAIL credentials are not in the database; logging event OTP for {} ({}): {}", username, email, otp);
-                return;
-            }
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "Email delivery is not configured. Add GMAIL host, port, username, and password in admin Settings.");
-        }
-        try {
-            MimeMessage message = sender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
-            String from = credentialService.mailFrom();
-            if (from == null || from.isBlank()) {
-                from = "noreply@localhost";
-            }
-            helper.setFrom(new InternetAddress(from));
-            helper.setTo(email);
-            helper.setSubject("Your event verification code");
-            helper.setText(
-                    "Hello " + username + ",\n\n"
-                            + "Your Radio Streaming verification code is " + otp + ".\n"
-                            + "It expires in 10 minutes. If you did not submit an event, you can ignore this email.\n",
-                    false);
-            sender.send(message);
-        } catch (Exception ex) {
-            log.warn("Failed to send event OTP to {}", email, ex);
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
-                    "Could not send the verification email. Check the address and try again.");
-        }
-        if (logOtp) {
-            log.info("Event OTP emailed to {} ({})", username, maskEmail(email));
-        }
+        mailDeliveryService.sendPlainText(
+                email,
+                "Your event verification code",
+                "Hello " + username + ",\n\n"
+                        + "Your Radio Streaming verification code is " + otp + ".\n"
+                        + "It expires in 10 minutes. If you did not submit an event, you can ignore this email.\n");
     }
 
     private EventSubmissionDocument requireOpen(String submissionId) {

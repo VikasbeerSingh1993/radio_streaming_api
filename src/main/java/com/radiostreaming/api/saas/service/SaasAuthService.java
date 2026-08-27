@@ -10,17 +10,8 @@ import com.radiostreaming.api.saas.repository.SaasPendingRegistrationRepository;
 import com.radiostreaming.api.saas.repository.SaasUserRepository;
 import com.radiostreaming.api.saas.repository.SaasUsageEventRepository;
 import com.radiostreaming.api.security.JwtService;
-import com.radiostreaming.api.service.CredentialService;
-import jakarta.mail.internet.InternetAddress;
-import jakarta.mail.internet.MimeMessage;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.task.TaskExecutor;
+import com.radiostreaming.api.service.MailDeliveryService;
 import org.springframework.http.HttpStatus;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -34,7 +25,6 @@ import java.util.Map;
 @Service
 public class SaasAuthService {
 
-    private static final Logger log = LoggerFactory.getLogger(SaasAuthService.class);
     private static final Duration OTP_TTL = Duration.ofMinutes(10);
     private static final int MAX_SENDS = 5;
 
@@ -43,10 +33,8 @@ public class SaasAuthService {
     private final SaasUsageEventRepository usageEventRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-    private final CredentialService credentialService;
-    private final TaskExecutor mailTaskExecutor;
+    private final MailDeliveryService mailDeliveryService;
     private final CreditMeteringService creditMeteringService;
-    private final boolean logOtp;
     private final SecureRandom random = new SecureRandom();
 
     public SaasAuthService(
@@ -55,19 +43,15 @@ public class SaasAuthService {
             SaasUsageEventRepository usageEventRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
-            CredentialService credentialService,
-            @Qualifier("mailTaskExecutor") TaskExecutor mailTaskExecutor,
-            CreditMeteringService creditMeteringService,
-            @Value("${app.mail.log-otp:false}") boolean logOtp) {
+            MailDeliveryService mailDeliveryService,
+            CreditMeteringService creditMeteringService) {
         this.userRepository = userRepository;
         this.pendingRepository = pendingRepository;
         this.usageEventRepository = usageEventRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
-        this.credentialService = credentialService;
-        this.mailTaskExecutor = mailTaskExecutor;
+        this.mailDeliveryService = mailDeliveryService;
         this.creditMeteringService = creditMeteringService;
-        this.logOtp = logOtp;
     }
 
     /** Step 1: collect details, email a one-time code. Account is created only after verify. */
@@ -108,8 +92,9 @@ public class SaasAuthService {
         pending.setSendCount(pending.getSendCount() + 1);
         pending.setVerifyAttempts(0);
         pending.setUpdatedAt(now);
+
+        deliverOtp(email, first, otp);
         pendingRepository.save(pending);
-        queueOtpDelivery(email, first, otp);
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", "otp_sent");
@@ -174,8 +159,10 @@ public class SaasAuthService {
         pending.setSendCount(pending.getSendCount() + 1);
         pending.setVerifyAttempts(0);
         pending.setUpdatedAt(now);
+
+        deliverOtp(email, pending.getFirstName(), otp);
         pendingRepository.save(pending);
-        queueOtpDelivery(email, pending.getFirstName(), otp);
+
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", "otp_sent");
         body.put("email", email);
@@ -229,40 +216,14 @@ public class SaasAuthService {
         return userRepository.findByEmailIgnoreCase(email).orElse(null);
     }
 
-    /** Persist first, then send mail off-thread so Railway / Gmail latency does not block the HTTP response. */
-    private void queueOtpDelivery(String email, String firstName, String otp) {
-        mailTaskExecutor.execute(() -> deliverOtp(email, firstName, otp));
-    }
-
     private void deliverOtp(String email, String firstName, String otp) {
-        JavaMailSender sender = credentialService.mailSender().orElse(null);
-        if (sender == null) {
-            log.info("Signup OTP for {} ({}): {} — configure GMAIL in app_credentials for email delivery",
-                    firstName, maskEmail(email), otp);
-            return;
-        }
-        try {
-            MimeMessage message = sender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
-            String from = credentialService.mailFrom();
-            if (from == null || from.isBlank()) {
-                from = "noreply@localhost";
-            }
-            helper.setFrom(new InternetAddress(from));
-            helper.setTo(email);
-            helper.setSubject("Your Divine Bliss verification code");
-            helper.setText(
-                    "Hello " + firstName + ",\n\n"
-                            + "Your Divine Bliss signup code is " + otp + ".\n"
-                            + "It expires in 10 minutes.\n\n"
-                            + "If you did not create an account, you can ignore this email.\n",
-                    false);
-            sender.send(message);
-            log.info("Signup OTP emailed to {}", maskEmail(email));
-        } catch (Exception ex) {
-            log.warn("Failed to email signup OTP to {}; logging code instead", maskEmail(email), ex);
-            log.info("Signup OTP for {} ({}): {}", firstName, maskEmail(email), otp);
-        }
+        mailDeliveryService.sendPlainText(
+                email,
+                "Your Divine Bliss verification code",
+                "Hello " + firstName + ",\n\n"
+                        + "Your Divine Bliss signup code is " + otp + ".\n"
+                        + "It expires in 10 minutes.\n\n"
+                        + "If you did not create an account, you can ignore this email.\n");
     }
 
     private Map<String, Object> authResponse(SaasUserDocument user) {
@@ -293,13 +254,5 @@ public class SaasAuthService {
 
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
-    }
-
-    private static String maskEmail(String email) {
-        int at = email.indexOf('@');
-        if (at <= 1) {
-            return "***";
-        }
-        return email.charAt(0) + "***" + email.substring(at);
     }
 }
